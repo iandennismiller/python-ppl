@@ -349,7 +349,7 @@ Directional relationships are interpreted from the current contact's perspective
 2. **Extract List**: Get unordered list immediately following heading
 3. **Parse List Items**: Each item format: `relationship_kind object_reference`
 4. **Resolve References**:
-   - Wiki links `[[Name]]` -> lookup contact by formatted name (FN)
+   - Wiki links `[[Name]]` -> lookup "Name.md" in markdown folder
    - URLs -> resolve to UID or create external reference
    - Plain text -> fuzzy match against contact names
 5. **Create Relationships**: Generate graph edges with current contact as subject
@@ -363,6 +363,113 @@ Directional relationships are interpreted from the current contact's perspective
    - Use URLs for external references: `- contact https://...`
    - Fall back to plain text if needed
 4. **Sort**: Order by relationship_kind for consistent output
+
+## Markdown File Format with YAML Front Matter
+
+### Complete File Structure
+
+Markdown files combine YAML front matter with Markdown content:
+
+```markdown
+---
+fn: John Smith
+uid: urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890
+rev: 2024-10-11T12:00:00Z
+email: john.smith@example.com
+tel: +1-555-0123
+adr_street: 123 Main St
+adr_locality: Springfield
+adr_region: IL
+adr_postal: 62701
+org: Acme Corp
+title: Software Engineer
+---
+
+# John Smith
+
+**Email:** john.smith@example.com  
+**Phone:** +1-555-0123  
+**Organization:** Acme Corp  
+**Title:** Software Engineer
+
+## Address
+
+123 Main St  
+Springfield, IL 62701
+
+## Related
+
+- parent [[Mary Smith]]
+- sibling [[Jane Smith]]
+- spouse [[Emily Johnson]]
+- friend [[Bob Wilson]]
+- colleague [[Alice Brown]]
+```
+
+### YAML Front Matter Specification
+
+**Purpose**: Machine-readable serialization of complete Contact object
+
+**Format**: Flat YAML (unnested namespace)
+- All vCard properties flattened to single-level keys
+- Complex properties like addresses use prefixed keys: `adr_street`, `adr_locality`, etc.
+- Array values serialized as YAML lists
+- Example: Multiple emails → `email: [primary@example.com, secondary@example.com]`
+
+**Delimiters**: 
+- Opening: `---` (three hyphens)
+- Closing: `---` (three hyphens)
+
+**Precedence**: Front matter data takes precedence over Markdown content during import
+
+### File Naming and Folder Operations
+
+#### Naming Convention
+- **VCF Files**: Named by UID → `{uid}.vcf` (e.g., `urn-uuid-12345.vcf`)
+- **Markdown Files**: Named by Full Name (FN) → `{fn}.md` (e.g., `John Smith.md`)
+
+#### Flat Namespace
+Within a markdown folder, file names create a flat namespace:
+- `John Smith.md` → Contact with FN="John Smith"
+- `Mary Smith.md` → Contact with FN="Mary Smith"
+- `Bob Wilson.md` → Contact with FN="Bob Wilson"
+
+#### Wiki-style Link Dereferencing
+1. Encounter `[[John Smith]]` in Related section
+2. Look up `John Smith.md` in current markdown folder
+3. Load and parse that file to get Contact object
+4. Create relationship edge to that Contact
+
+#### Bulk Import from Markdown Folder
+```
+1. Scan folder for *.md files
+2. For each file:
+   a. Parse YAML front matter → extract Contact properties
+   b. Parse Markdown content → extract additional details
+   c. Parse Related section → extract relationship tuples
+   d. Add Contact to graph (or update if REV is newer)
+3. Second pass: Resolve all wiki-style links
+4. Create relationship edges in graph
+```
+
+#### Bulk Export to Markdown Folder
+```
+1. For each Contact in graph:
+   a. Generate filename: "{contact.fn}.md"
+   b. Serialize Contact as Flat YAML → front matter
+   c. Render Contact as Markdown → content
+   d. Render Related section with wiki-style links
+   e. Combine front matter + content
+   f. Write to file (check REV for smart overwrite)
+```
+
+### Idempotent Operations
+
+Like VCF import/export, Markdown operations are idempotent:
+- **Import**: Use REV field (from front matter) to determine if update needed
+- **Export**: Check existing file's REV before overwriting
+- **Wiki Links**: Consistent resolution ensures same relationships each time
+- **Front Matter**: Flat YAML ensures consistent serialization
 
 ### Integration with vCard RELATED
 

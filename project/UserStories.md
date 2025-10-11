@@ -147,6 +147,52 @@ Markdown rendering for human consumption. DOM-based parsing is novel approach. T
 
 ---
 
+## Story 6A: Import/Export Markdown Folder
+
+As a user
+I want to import and export contacts from a folder of .md files
+So that I can work with contacts in a human-friendly, version-controllable format
+
+### Acceptance Criteria
+- [ ] System iterates through all *.md files in specified folder
+- [ ] Each Markdown file is parsed: YAML front matter + content + Related section
+- [ ] Files named by Full Name (FN): "First Last.md"
+- [ ] YAML front matter contains Flat YAML serialization of Contact
+- [ ] Front matter delimited by `---` markers
+- [ ] Wiki-style links `[[Contact Name]]` dereferenced to "Contact Name.md" in folder
+- [ ] Flat namespace used for wiki-link resolution
+- [ ] Related section parsed to extract relationship tuples
+- [ ] If contact exists (by UID from front matter), check REV field
+- [ ] Export creates one .md file per contact, named by FN
+- [ ] Export includes YAML front matter with Flat YAML Contact data
+- [ ] Export renders Related section with wiki-style links to other contacts
+- [ ] Operations are idempotent (same as VCF import/export)
+
+### Priority
+Medium
+
+### Notes
+Markdown format provides human-readable, git-friendly contact storage. YAML front matter ensures machine-readable data is preserved. Example file:
+
+```markdown
+---
+fn: John Smith
+uid: urn:uuid:12345
+email: john@example.com
+---
+
+# John Smith
+
+Email: john@example.com
+
+## Related
+
+- parent [[Mary Smith]]
+- friend [[Bob Johnson]]
+```
+
+---
+
 ## Story 7: Command-Line Interface
 
 As a user

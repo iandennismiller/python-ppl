@@ -93,22 +93,31 @@ PPL is a Python application with a graph-based architecture for managing contact
 - from_flat_yaml(yaml_str) -> Contact
 
 ### Component 6: Markdown Renderer/Parser (/ppl/serializers/markdown.py)
-**Purpose:** Handle Markdown format for contacts with relationship representation  
+**Purpose:** Handle Markdown format for contacts with relationship representation and YAML front matter  
 **Responsibilities:**
-- Render Contact to human-readable Markdown
+- Render Contact to human-readable Markdown with YAML front matter
 - Parse Markdown DOM to Contact objects
+- Serialize Contact as "Flat YAML" in front matter (between `---` delimiters)
 - Render relationships as "Related" section with unordered list
 - Parse "Related" heading (case-insensitive) with relationship tuples
 - Support wiki-style links [[Name]] for related contacts
 - Handle relationship tuples: (relationship_kind, object) where subject is implied
+- Support bulk import/export from folder of .md files
+- Name files by Full Name (FN): "First Last.md"
+- Dereference wiki-style links using flat namespace in markdown folder
 - Provide clean display format
 
-**Dependencies:** marko-py library  
+**Dependencies:** marko-py library, pyyaml library  
 **Interfaces:**
-- to_markdown(contact) -> str (includes "Related" section with relationship list)
-- from_markdown(markdown_str) -> Contact (parses "Related" section)
+- to_markdown(contact) -> str (includes YAML front matter and "Related" section)
+- from_markdown(markdown_str) -> Contact (parses front matter and "Related" section)
 - parse_related_section(markdown_dom) -> List[Relationship]
 - render_related_section(relationships) -> str
+- parse_yaml_front_matter(markdown_str) -> dict
+- render_yaml_front_matter(contact) -> str
+- bulk_import_markdown(folder_path) -> List[Contact]
+- bulk_export_markdown(contacts, folder_path) -> None
+- resolve_wiki_link(link_text, folder_path) -> Contact
 
 ### Component 7: Filter Pipeline (/ppl/filters/)
 **Purpose:** Extensible data validation and curation  
@@ -288,11 +297,84 @@ to_flat_yaml(contact: Contact) -> str
 # Markdown
 to_markdown(contact: Contact) -> str
 from_markdown(md_str: str) -> Contact
+bulk_import_markdown(folder: str) -> List[Contact]
+bulk_export_markdown(contacts: List[Contact], folder: str) -> None
 
 # Markdown Relationship Format
 parse_related_section(markdown_dom: MarkoNode) -> List[Relationship]
 render_related_section(contact: Contact, relationships: List[Relationship]) -> str
+parse_yaml_front_matter(markdown_str: str) -> dict
+render_yaml_front_matter(contact: Contact) -> str
+resolve_wiki_link(link_text: str, folder_path: str) -> Contact
 ```
+
+### Markdown File Format Specification
+
+#### Complete File Structure
+Markdown files contain both YAML front matter and Markdown content:
+
+```markdown
+---
+# YAML Front Matter (Flat YAML serialization of Contact)
+fn: First Last
+uid: urn:uuid:12345678-1234-1234-1234-123456789abc
+email: first.last@example.com
+tel: +1-555-0100
+---
+
+# First Last
+
+Email: first.last@example.com
+Phone: +1-555-0100
+
+## Related
+
+- parent [[Mary Last]]
+- friend [[Bob Johnson]]
+```
+
+#### YAML Front Matter
+- **Delimiters**: Front matter enclosed between `---` markers
+- **Format**: "Flat YAML" - Contact object serialized with flattened (unnested) keys
+- **Content**: All Contact properties in flat namespace
+- **Purpose**: Machine-readable representation for easy parsing
+
+#### Markdown Content
+- **Heading**: Contact's Full Name (FN)
+- **Body**: Human-readable contact information
+- **Related Section**: Relationship list (see Markdown Relationship Format Specification)
+
+#### File Naming Convention
+- **Pattern**: `{Full Name}.md`
+- **Example**: Contact with FN="First Last" → File: `First Last.md`
+- **Namespace**: Flat namespace within markdown folder
+- **UID vs FN**: VCF files use UID for naming, Markdown files use FN
+
+#### Folder Operations
+
+**Bulk Import from Markdown Folder:**
+```python
+contacts = bulk_import_markdown("/path/to/markdown/folder")
+# Iterates *.md files
+# Parses YAML front matter to extract Contact properties
+# Parses markdown content including Related section
+# Resolves wiki-style links within folder namespace
+```
+
+**Bulk Export to Markdown Folder:**
+```python
+bulk_export_markdown(contacts, "/path/to/output/folder")
+# Creates one .md file per contact
+# Names files: "{contact.fn}.md"
+# Serializes Contact as Flat YAML in front matter
+# Renders markdown content with Related section
+```
+
+#### Wiki-style Link Resolution
+- **Format**: `[[Contact Name]]`
+- **Dereferencing**: Looks up `Contact Name.md` in the same folder
+- **Namespace**: Flat namespace based on FN field
+- **Example**: `[[First Last]]` → resolves to `First Last.md` → Contact with FN="First Last"
 
 ### Markdown Relationship Format Specification
 

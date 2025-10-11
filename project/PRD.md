@@ -57,10 +57,15 @@ Contact management systems often treat contacts in isolation, failing to capture
 - **Idempotent Operations**: Import/export operations should be repeatable without data loss
 
 #### Bulk Operations
-- **Folder Import**: Iterate *.VCF files in a folder and import all contacts
-- **Folder Export**: Bulk export graph as .VCF files to destination folder
-- **UID-based Naming**: Name VCF files according to UID field
+- **VCF Folder Import**: Iterate *.VCF files in a folder and import all contacts
+- **VCF Folder Export**: Bulk export graph as .VCF files to destination folder
+- **VCF UID-based Naming**: Name VCF files according to UID field
+- **Markdown Folder Import**: Iterate *.md files in a folder and import all contacts
+- **Markdown Folder Export**: Bulk export graph as .md files to destination folder
+- **Markdown FN-based Naming**: Name Markdown files according to Full Name (FN) field: "First Last.md"
+- **Wiki-style Link Resolution**: Dereference [[Contact Name]] to "Contact Name.md" in flat namespace
 - **Smart Overwrite**: Only overwrite existing files when graph has newer data
+- **YAML Front Matter**: Include Flat YAML serialization of Contact in Markdown files between `---` delimiters
 
 #### Data Curation
 - **Filter Pipeline**: Extensible queue for data validation and curation

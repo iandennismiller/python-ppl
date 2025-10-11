@@ -95,30 +95,43 @@
 ---
 
 ### Phase 5: Markdown Rendering and Parsing with Relationships
-**Duration:** 1-2 weeks  
+**Duration:** 2-3 weeks  
 **Goals:**
-- Render contacts as Markdown with relationship sections
+- Render contacts as Markdown with YAML front matter and relationship sections
 - Parse Markdown DOM to Contact objects
 - Implement "Related" section with structured relationship format
+- Support bulk folder operations
 - Provide human-friendly display
 
 **Deliverables:**
 - [ ] /ppl/serializers/markdown.py module
-- [ ] to_markdown(contact) function with clean formatting
+- [ ] YAML front matter support with `---` delimiters
+- [ ] Flat YAML serialization for Contact in front matter
+- [ ] parse_yaml_front_matter(markdown_str) function
+- [ ] render_yaml_front_matter(contact) function
+- [ ] to_markdown(contact) function with YAML front matter + content
 - [ ] Render "Related" heading with unordered list of relationships
 - [ ] Format relationships as `- relationship_kind [[Contact Name]]`
 - [ ] Support wiki-style links `[[Name]]` for related contacts
 - [ ] from_markdown(markdown_str) using marko DOM
+- [ ] Parse YAML front matter (precedence over Markdown content)
 - [ ] Parse "Related" section (case-insensitive heading detection)
 - [ ] Extract relationship tuples `(relationship_kind, object)`
-- [ ] Resolve wiki-style links to contact references
+- [ ] Resolve wiki-style links to "Contact Name.md" in folder
+- [ ] bulk_import_markdown(folder_path) function
+- [ ] bulk_export_markdown(contacts, folder_path) function
+- [ ] File naming by Full Name (FN): "{fn}.md"
+- [ ] Flat namespace for wiki-link dereferencing
 - [ ] Create graph edges from parsed relationships
-- [ ] Markdown template design with "Related" section
+- [ ] Markdown template design with front matter and "Related" section
+- [ ] Unit tests for YAML front matter parsing/rendering
 - [ ] Unit tests for Markdown serializer
 - [ ] Unit tests for relationship parsing/rendering
+- [ ] Unit tests for wiki-link resolution
+- [ ] Unit tests for bulk folder operations
 - [ ] Sample Markdown outputs for validation with relationships
 
-**Dependencies:** Phase 1 complete
+**Dependencies:** Phase 1, Phase 4 (for Flat YAML) complete
 
 ---
 
@@ -131,8 +144,10 @@
 
 **Deliverables:**
 - [ ] /ppl/cli.py module using Click
-- [ ] `ppl import` command (folder of VCFs to graph)
-- [ ] `ppl export` command (graph to folder of VCFs)
+- [ ] `ppl import vcf` command (folder of VCFs to graph)
+- [ ] `ppl export vcf` command (graph to folder of VCFs)
+- [ ] `ppl import markdown` command (folder of .md files to graph)
+- [ ] `ppl export markdown` command (graph to folder of .md files)
 - [ ] `ppl list` command (list all contacts)
 - [ ] `ppl search` command (search contacts)
 - [ ] `ppl show <uid>` command (display single contact)
