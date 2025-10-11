@@ -97,7 +97,8 @@ PPL is a Python application with a graph-based architecture for managing contact
 **Responsibilities:**
 - Render Contact to human-readable Markdown with YAML front matter
 - Parse Markdown DOM to Contact objects
-- Serialize Contact as "Flat YAML" in front matter (between `---` delimiters)
+- Serialize Contact using vCard 4.0 property names in YAML front matter (between `---` delimiters)
+- Use proper vCard 4.0 property names: FN, UID, EMAIL, TEL, ADR, ORG, TITLE, etc.
 - Render relationships as "Related" section with unordered list
 - Parse "Related" heading (case-insensitive) with relationship tuples
 - Support wiki-style links [[Name]] for related contacts
@@ -315,11 +316,11 @@ Markdown files contain both YAML front matter and Markdown content:
 
 ```markdown
 ---
-# YAML Front Matter (Flat YAML serialization of Contact)
-fn: First Last
-uid: urn:uuid:12345678-1234-1234-1234-123456789abc
-email: first.last@example.com
-tel: +1-555-0100
+# YAML Front Matter (vCard 4.0 properties in YAML format)
+FN: First Last
+UID: urn:uuid:12345678-1234-1234-1234-123456789abc
+EMAIL: first.last@example.com
+TEL: +1-555-0100
 ---
 
 # First Last
@@ -335,8 +336,10 @@ Phone: +1-555-0100
 
 #### YAML Front Matter
 - **Delimiters**: Front matter enclosed between `---` markers
-- **Format**: "Flat YAML" - Contact object serialized with flattened (unnested) keys
-- **Content**: All Contact properties in flat namespace
+- **Format**: vCard 4.0 properties as YAML keys (FN, UID, EMAIL, TEL, ADR, etc.)
+- **Content**: All vCard 4.0 properties from Contact object
+- **Property Names**: Must match vCard 4.0 specification exactly (uppercase preferred)
+- **Complex Properties**: Serialized as vCard-compliant strings (e.g., ADR: `;;street;locality;region;postal;country`)
 - **Purpose**: Machine-readable representation for easy parsing
 
 #### Markdown Content

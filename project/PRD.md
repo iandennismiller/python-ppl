@@ -48,7 +48,7 @@ Contact management systems often treat contacts in isolation, failing to capture
 - **vCard Export**: Generate vCard 4.0 compliant .VCF files with RELATED properties from graph
 - **Social Graph Projection**: Use RELATED field to represent the NetworkX graph in vCard format
 - **YAML Import/Export**: Support standard YAML serialization
-- **Flat YAML**: Support flattened YAML with unnested namespace
+- **Flat YAML**: Support flattened YAML with unnested namespace using vCard 4.0 property names as keys
 - **Markdown Import/Export**: Use Markdown DOM for contact representation with structured relationship format
 - **Markdown Relationship Format**: Parse and render "Related" heading with unordered list of relationship tuples `(relationship_kind, object)` where subject is implied
 - **Wiki-style Links**: Support `[[Contact Name]]` syntax in Markdown for related contacts
@@ -65,7 +65,7 @@ Contact management systems often treat contacts in isolation, failing to capture
 - **Markdown FN-based Naming**: Name Markdown files according to Full Name (FN) field: "First Last.md"
 - **Wiki-style Link Resolution**: Dereference [[Contact Name]] to "Contact Name.md" in flat namespace
 - **Smart Overwrite**: Only overwrite existing files when graph has newer data
-- **YAML Front Matter**: Include Flat YAML serialization of Contact in Markdown files between `---` delimiters
+- **YAML Front Matter**: Include vCard 4.0 properties as YAML in Markdown files between `---` delimiters (e.g., FN, UID, EMAIL, TEL)
 
 #### Data Curation
 - **Filter Pipeline**: Extensible queue for data validation and curation

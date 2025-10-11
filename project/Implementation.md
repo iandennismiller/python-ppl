@@ -106,7 +106,7 @@
 **Deliverables:**
 - [ ] /ppl/serializers/markdown.py module
 - [ ] YAML front matter support with `---` delimiters
-- [ ] Flat YAML serialization for Contact in front matter
+- [ ] vCard 4.0 property serialization in YAML front matter (FN, UID, EMAIL, TEL, etc.)
 - [ ] parse_yaml_front_matter(markdown_str) function
 - [ ] render_yaml_front_matter(contact) function
 - [ ] to_markdown(contact) function with YAML front matter + content

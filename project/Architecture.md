@@ -372,17 +372,14 @@ Markdown files combine YAML front matter with Markdown content:
 
 ```markdown
 ---
-fn: John Smith
-uid: urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890
-rev: 2024-10-11T12:00:00Z
-email: john.smith@example.com
-tel: +1-555-0123
-adr_street: 123 Main St
-adr_locality: Springfield
-adr_region: IL
-adr_postal: 62701
-org: Acme Corp
-title: Software Engineer
+FN: John Smith
+UID: urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890
+REV: 2024-10-11T12:00:00Z
+EMAIL: john.smith@example.com
+TEL: +1-555-0123
+ADR: ;;123 Main St;Springfield;IL;62701;USA
+ORG: Acme Corp
+TITLE: Software Engineer
 ---
 
 # John Smith
@@ -410,11 +407,12 @@ Springfield, IL 62701
 
 **Purpose**: Machine-readable serialization of complete Contact object
 
-**Format**: Flat YAML (unnested namespace)
-- All vCard properties flattened to single-level keys
-- Complex properties like addresses use prefixed keys: `adr_street`, `adr_locality`, etc.
+**Format**: Flat YAML with vCard 4.0 property names
+- All vCard 4.0 property names used as keys (FN, UID, REV, EMAIL, TEL, ADR, etc.)
+- Complex properties like ADR serialized as vCard-compliant strings: `;;street;locality;region;postal;country`
 - Array values serialized as YAML lists
-- Example: Multiple emails → `email: [primary@example.com, secondary@example.com]`
+- Example: Multiple emails → `EMAIL: [primary@example.com, secondary@example.com]`
+- Property names follow vCard 4.0 specification exactly
 
 **Delimiters**: 
 - Opening: `---` (three hyphens)
