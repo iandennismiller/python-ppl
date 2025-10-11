@@ -179,6 +179,8 @@ Markdown format provides human-readable, git-friendly contact storage. YAML fron
 FN: John Smith
 UID: urn:uuid:12345
 EMAIL: john@example.com
+RELATED;TYPE=parent: urn:uuid:67890
+RELATED;TYPE=friend: urn:uuid:abcde
 ---
 
 # John Smith

@@ -321,6 +321,8 @@ FN: First Last
 UID: urn:uuid:12345678-1234-1234-1234-123456789abc
 EMAIL: first.last@example.com
 TEL: +1-555-0100
+RELATED;TYPE=parent: urn:uuid:abcd1234-5678-90ab-cdef-0123456789ab
+RELATED;TYPE=friend: urn:uuid:bcde2345-6789-01bc-def0-123456789abc
 ---
 
 # First Last
@@ -336,10 +338,12 @@ Phone: +1-555-0100
 
 #### YAML Front Matter
 - **Delimiters**: Front matter enclosed between `---` markers
-- **Format**: vCard 4.0 properties as YAML keys (FN, UID, EMAIL, TEL, ADR, etc.)
+- **Format**: vCard 4.0 properties as YAML keys (FN, UID, EMAIL, TEL, ADR, RELATED, etc.)
 - **Content**: All vCard 4.0 properties from Contact object
 - **Property Names**: Must match vCard 4.0 specification exactly (uppercase preferred)
 - **Complex Properties**: Serialized as vCard-compliant strings (e.g., ADR: `;;street;locality;region;postal;country`)
+- **RELATED Properties**: Include TYPE parameter (e.g., `RELATED;TYPE=parent: urn:uuid:...`)
+- **Multiple RELATED**: Each relationship listed as separate RELATED property
 - **Purpose**: Machine-readable representation for easy parsing
 
 #### Markdown Content
