@@ -93,16 +93,22 @@ PPL is a Python application with a graph-based architecture for managing contact
 - from_flat_yaml(yaml_str) -> Contact
 
 ### Component 6: Markdown Renderer/Parser (/ppl/serializers/markdown.py)
-**Purpose:** Handle Markdown format for contacts  
+**Purpose:** Handle Markdown format for contacts with relationship representation  
 **Responsibilities:**
 - Render Contact to human-readable Markdown
 - Parse Markdown DOM to Contact objects
+- Render relationships as "Related" section with unordered list
+- Parse "Related" heading (case-insensitive) with relationship tuples
+- Support wiki-style links [[Name]] for related contacts
+- Handle relationship tuples: (relationship_kind, object) where subject is implied
 - Provide clean display format
 
 **Dependencies:** marko-py library  
 **Interfaces:**
-- to_markdown(contact) -> str
-- from_markdown(markdown_str) -> Contact
+- to_markdown(contact) -> str (includes "Related" section with relationship list)
+- from_markdown(markdown_str) -> Contact (parses "Related" section)
+- parse_related_section(markdown_dom) -> List[Relationship]
+- render_related_section(relationships) -> str
 
 ### Component 7: Filter Pipeline (/ppl/filters/)
 **Purpose:** Extensible data validation and curation  
@@ -282,6 +288,90 @@ to_flat_yaml(contact: Contact) -> str
 # Markdown
 to_markdown(contact: Contact) -> str
 from_markdown(md_str: str) -> Contact
+
+# Markdown Relationship Format
+parse_related_section(markdown_dom: MarkoNode) -> List[Relationship]
+render_related_section(contact: Contact, relationships: List[Relationship]) -> str
+```
+
+### Markdown Relationship Format Specification
+
+#### Structure
+Relationships are represented in Markdown using a specific DOM structure:
+- **Heading**: "Related" (case-insensitive: "related", "RELATED", "Related", etc.)
+- **Content**: Unordered list beneath the heading
+- **List Items**: Each item is a relationship tuple
+
+#### Relationship Tuple Format
+```
+- relationship_kind object
+```
+
+Where:
+- `relationship_kind`: One of the vCard 4.0 RELATED TYPE values (parent, friend, colleague, etc.)
+- `object`: The related contact, which can be:
+  - Wiki-style link: `[[Firstname Lastname]]`
+  - URL: `http://example.com/contact`
+  - Plain text: `John Doe`
+
+#### Implied Subject
+The subject of all relationships in a "Related" section is the current contact. Therefore:
+- Graph triple: `(subject, relationship_kind, object)`
+- Markdown tuple: `(relationship_kind, object)` - subject is implied
+
+#### Examples
+
+**Markdown Representation:**
+```markdown
+# John Smith
+
+Email: john@example.com
+
+## Related
+
+- parent [[Mary Smith]]
+- sibling [[Jane Smith]]
+- friend [[Bob Johnson]]
+- colleague https://example.com/contacts/alice.vcf
+```
+
+**Interpretation:**
+- John Smith is the child of Mary Smith (directional: child->parent)
+- John Smith is the sibling of Jane Smith
+- John Smith is a friend of Bob Johnson
+- John Smith is a colleague of Alice (referenced by URL)
+
+#### Directional Relationships
+For directional relationships, the relationship type indicates the direction:
+- `- parent [[Mary]]` means "current contact's parent is Mary" (current contact is child)
+- `- child [[Tom]]` means "current contact's child is Tom" (current contact is parent)
+
+#### Multiple Relationship Types
+Multiple relationships to the same contact can be listed separately:
+```markdown
+## Related
+
+- friend [[Bob]]
+- colleague [[Bob]]
+```
+
+#### Parsing Rules
+1. Find heading with text "Related" (case-insensitive)
+2. Extract unordered list immediately following heading
+3. Parse each list item as `relationship_kind object`
+4. Resolve object references:
+   - Wiki links `[[Name]]` -> lookup by name in graph
+   - URLs -> resolve to UID or external reference
+   - Plain text -> attempt fuzzy match in graph
+5. Create Relationship with current contact as subject
+
+#### Rendering Rules
+1. Create "## Related" heading (level 2)
+2. For each relationship where current contact is subject:
+   - Format as `- relationship_kind [[object_name]]`
+   - Prefer wiki-style links for internal contacts
+   - Use URLs for external references
+3. Sort by relationship_kind for consistency
 ```
 
 #### Filter API

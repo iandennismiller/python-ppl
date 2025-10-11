@@ -255,6 +255,142 @@ All relationship types follow vCard 4.0 specification:
 - Single relationship edge can have multiple types
 - Each type is maintained separately in graph metadata
 
+## Markdown Relationship Representation
+
+### Format Specification
+Relationships are serialized in Markdown using a structured format within the document object model (DOM):
+
+**Structure:**
+```markdown
+## Related
+
+- relationship_kind [[Contact Name]]
+- relationship_kind URL
+```
+
+**Key Features:**
+1. **Heading**: "Related" (case-insensitive)
+2. **Unordered List**: Each item is a relationship tuple
+3. **Tuple Format**: `(relationship_kind, object)` where subject is implied
+4. **Objects**: Wiki-style links `[[Name]]`, URLs, or plain text
+
+### Graph Triple to Markdown Tuple
+
+**Full Graph Representation:**
+```
+(Subject Contact, relationship_kind, Object Contact)
+```
+
+**Markdown Representation:**
+```markdown
+## Related
+
+- relationship_kind [[Object Contact]]
+```
+
+The subject is always the current contact, so it's implied and not repeated in the list.
+
+### Examples
+
+**Example 1: Family Relationships**
+```markdown
+# John Smith
+
+## Related
+
+- parent [[Mary Smith]]
+- parent [[Robert Smith]]
+- sibling [[Jane Smith]]
+- spouse [[Emily Johnson]]
+- child [[Tommy Smith]]
+```
+
+Interpretation:
+- John Smith's parents are Mary Smith and Robert Smith
+- John Smith's sibling is Jane Smith
+- John Smith is married to Emily Johnson
+- John Smith's child is Tommy Smith
+
+**Example 2: Professional Relationships**
+```markdown
+# Alice Johnson
+
+Email: alice@company.com
+
+## Related
+
+- colleague [[Bob Wilson]]
+- colleague https://company.com/contacts/carol.vcf
+- agent [[Legal Associates LLC]]
+```
+
+**Example 3: Mixed Relationships**
+```markdown
+# Sarah Lee
+
+## Related
+
+- friend [[Mike Chen]]
+- colleague [[Mike Chen]]
+- emergency [[Mom]]
+```
+
+### Directional Relationship Semantics
+
+Directional relationships are interpreted from the current contact's perspective:
+
+- `- parent [[Mary]]`: Current contact is the child of Mary
+- `- child [[Tom]]`: Current contact is the parent of Tom
+- `- spouse [[Alex]]`: Bidirectional - both are spouses
+
+### Parsing Algorithm
+
+1. **Locate "Related" Section**: Find heading with text matching "related" (case-insensitive)
+2. **Extract List**: Get unordered list immediately following heading
+3. **Parse List Items**: Each item format: `relationship_kind object_reference`
+4. **Resolve References**:
+   - Wiki links `[[Name]]` -> lookup contact by formatted name (FN)
+   - URLs -> resolve to UID or create external reference
+   - Plain text -> fuzzy match against contact names
+5. **Create Relationships**: Generate graph edges with current contact as subject
+
+### Rendering Algorithm
+
+1. **Generate Heading**: Create "## Related" section
+2. **Collect Relationships**: Get all relationships where current contact is subject
+3. **Format List Items**:
+   - Prefer wiki-style links for internal contacts: `- friend [[Bob Johnson]]`
+   - Use URLs for external references: `- contact https://...`
+   - Fall back to plain text if needed
+4. **Sort**: Order by relationship_kind for consistent output
+
+### Integration with vCard RELATED
+
+The Markdown format complements vCard RELATED:
+
+**vCard Format:**
+```
+BEGIN:VCARD
+VERSION:4.0
+FN:John Smith
+UID:urn:uuid:12345
+RELATED;TYPE=parent:urn:uuid:67890
+RELATED;TYPE=friend:urn:uuid:abcdef
+END:VCARD
+```
+
+**Equivalent Markdown:**
+```markdown
+# John Smith
+
+## Related
+
+- parent [[Mary Smith]]
+- friend [[Bob Johnson]]
+```
+
+Both representations map to the same graph structure, allowing seamless conversion between formats.
+
 ## Design Trade-offs
 
 ### vCard RELATED vs Custom Relationship Storage

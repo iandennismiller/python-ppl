@@ -112,23 +112,38 @@ Developer-friendly format for programmatic access and version control.
 
 ---
 
-## Story 6: Markdown Contact Display
+## Story 6: Markdown Contact Display with Relationships
 
 As a user
-I want to view contacts in Markdown format
+I want to view contacts in Markdown format with relationships
 So that I can read contact information in a clean, human-friendly way
 
 ### Acceptance Criteria
 - [ ] Can render Contact to Markdown representation
 - [ ] Markdown is readable and well-formatted
 - [ ] Includes all relevant contact information
+- [ ] Renders "Related" section with unordered list of relationships
+- [ ] Relationship format: `- relationship_kind [[Contact Name]]`
+- [ ] Supports wiki-style links `[[Name]]` for related contacts
 - [ ] Can parse Markdown back into Contact (via DOM)
+- [ ] Can parse "Related" section (case-insensitive) to extract relationships
+- [ ] Relationship tuples are `(relationship_kind, object)` with implied subject
 
 ### Priority
 Medium
 
 ### Notes
-Markdown rendering for human consumption. DOM-based parsing is novel approach.
+Markdown rendering for human consumption. DOM-based parsing is novel approach. The "Related" section provides a clean, readable way to display relationship networks. Example:
+
+```markdown
+# John Smith
+
+## Related
+
+- parent [[Mary Smith]]
+- friend [[Bob Johnson]]
+- colleague [[Alice Williams]]
+```
 
 ---
 

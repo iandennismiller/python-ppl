@@ -94,20 +94,29 @@
 
 ---
 
-### Phase 5: Markdown Rendering and Parsing
+### Phase 5: Markdown Rendering and Parsing with Relationships
 **Duration:** 1-2 weeks  
 **Goals:**
-- Render contacts as Markdown
+- Render contacts as Markdown with relationship sections
 - Parse Markdown DOM to Contact objects
+- Implement "Related" section with structured relationship format
 - Provide human-friendly display
 
 **Deliverables:**
 - [ ] /ppl/serializers/markdown.py module
 - [ ] to_markdown(contact) function with clean formatting
+- [ ] Render "Related" heading with unordered list of relationships
+- [ ] Format relationships as `- relationship_kind [[Contact Name]]`
+- [ ] Support wiki-style links `[[Name]]` for related contacts
 - [ ] from_markdown(markdown_str) using marko DOM
-- [ ] Markdown template design
+- [ ] Parse "Related" section (case-insensitive heading detection)
+- [ ] Extract relationship tuples `(relationship_kind, object)`
+- [ ] Resolve wiki-style links to contact references
+- [ ] Create graph edges from parsed relationships
+- [ ] Markdown template design with "Related" section
 - [ ] Unit tests for Markdown serializer
-- [ ] Sample Markdown outputs for validation
+- [ ] Unit tests for relationship parsing/rendering
+- [ ] Sample Markdown outputs for validation with relationships
 
 **Dependencies:** Phase 1 complete
 

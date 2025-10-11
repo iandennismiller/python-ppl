@@ -49,7 +49,9 @@ Contact management systems often treat contacts in isolation, failing to capture
 - **Social Graph Projection**: Use RELATED field to represent the NetworkX graph in vCard format
 - **YAML Import/Export**: Support standard YAML serialization
 - **Flat YAML**: Support flattened YAML with unnested namespace
-- **Markdown Import/Export**: Use Markdown DOM for contact representation
+- **Markdown Import/Export**: Use Markdown DOM for contact representation with structured relationship format
+- **Markdown Relationship Format**: Parse and render "Related" heading with unordered list of relationship tuples `(relationship_kind, object)` where subject is implied
+- **Wiki-style Links**: Support `[[Contact Name]]` syntax in Markdown for related contacts
 - **REV-based Merging**: Use vCard 4.0 REV field (timestamp) to determine data freshness and merge conflicts
 - **UID Field**: Use vCard 4.0 UID field for unique contact identification
 - **Idempotent Operations**: Import/export operations should be repeatable without data loss
