@@ -21,28 +21,32 @@ PPL is a Python application with a graph-based architecture for managing contact
 - Export graph structure
 
 ### Component 2: Contact Model (/ppl/models/contact.py)
-**Purpose:** Data model representing a person or organization  
+**Purpose:** Data model representing a person or organization (vCard 4.0 entity)  
 **Responsibilities:**
-- Store contact information (name, email, phone, address, etc.)
-- Maintain UID for unique identification
-- Track REV timestamp for version control
-- Validate contact data
+- Store all vCard 4.0 properties (FN, N, UID, REV, EMAIL, TEL, ADR, RELATED, etc.)
+- Maintain UID for unique identification (vCard 4.0 UID property)
+- Track REV timestamp for version control and merge logic (vCard 4.0 REV property)
+- Manage RELATED properties to represent social graph connections
+- Validate contact data against vCard 4.0 specification
+- Support vCard 4.0 property taxonomy and cardinality rules
 
-**Dependencies:** vobject for vCard schema  
+**Dependencies:** vobject for vCard 4.0 schema  
 **Interfaces:**
-- Serialize to vCard 4.0
+- Serialize to vCard 4.0 (including RELATED properties)
 - Serialize to YAML
 - Serialize to Markdown
 - Parse from various formats
-- Compare timestamps (REV field)
+- Compare timestamps (REV field) for merge decisions
+- Get/set RELATED properties (social graph edges)
 
 ### Component 3: Relationship Model (/ppl/models/relationship.py)
-**Purpose:** Model connections between contacts  
+**Purpose:** Model connections between contacts (maps to vCard 4.0 RELATED property)  
 **Responsibilities:**
-- Define relationship type/kind
-- Support directional relationships (source->target)
-- Support bidirectional relationships
-- Store gender-neutral relationship data
+- Define relationship types using vCard 4.0 RELATED TYPE taxonomy
+- Support directional relationships (source->target, e.g., child->parent)
+- Support bidirectional relationships (e.g., friend, colleague)
+- Store gender-neutral relationship data (aligned with vCard 4.0)
+- Convert to/from vCard 4.0 RELATED property format
 - Optional gender rendering when contact data available
 
 **Dependencies:** None (pure Python)  
@@ -53,17 +57,22 @@ PPL is a Python application with a graph-based architecture for managing contact
 - Render with optional gender context
 
 ### Component 4: vCard Importer/Exporter (/ppl/serializers/vcard.py)
-**Purpose:** Handle vCard 4.0 format import/export  
+**Purpose:** Handle vCard 4.0 format import/export with RELATED properties  
 **Responsibilities:**
-- Parse .VCF files to Contact objects
-- Generate .VCF files from Contact objects
-- Compare REV fields for merge decisions
-- Ensure vCard 4.0 compliance
+- Parse .VCF files to Contact objects (including all vCard 4.0 properties)
+- Extract RELATED properties to build graph relationships
+- Generate .VCF files from Contact objects with RELATED properties
+- Project NetworkX graph edges as vCard RELATED properties
+- Compare REV fields for merge decisions (vCard 4.0 synchronization)
+- Ensure full vCard 4.0 specification compliance
+- Handle vCard 4.0 property taxonomy and parameters
 
 **Dependencies:** vobject library  
 **Interfaces:**
-- import_vcard(file_path) -> Contact
-- export_vcard(contact, file_path)
+- import_vcard(file_path) -> Contact (with RELATED properties)
+- export_vcard(contact, file_path) (includes RELATED from graph edges)
+- extract_relationships(contact) -> List[Relationship]
+- inject_relationships(contact, relationships) -> Contact
 - compare_rev(contact1, contact2) -> bool
 - bulk_import(folder_path) -> List[Contact]
 - bulk_export(contacts, folder_path)
@@ -138,36 +147,110 @@ PPL is a Python application with a graph-based architecture for managing contact
 
 ## Data Models
 
-### Contact
+### Contact (vCard 4.0 Entity)
 ```python
 class Contact:
-    uid: str  # Unique identifier (UUID)
-    rev: datetime  # Revision timestamp
-    fn: str  # Formatted name (required)
-    n: StructuredName  # Structured name
-    email: List[str]  # Email addresses
-    tel: List[str]  # Phone numbers
-    adr: List[Address]  # Addresses
-    org: str  # Organization
+    # Required Properties (vCard 4.0)
+    fn: str  # Formatted name (FN) - REQUIRED
+    version: str = "4.0"  # VERSION - REQUIRED
+    
+    # Identification Properties
+    uid: str  # Unique identifier (UID) - globally unique
+    n: StructuredName  # Structured name (N) - family, given, additional, prefixes, suffixes
+    nickname: List[str]  # Nickname(s)
+    photo: URI  # Photo/avatar
+    bday: date  # Birthday
+    anniversary: date  # Anniversary
+    gender: str  # Gender identity (separate from relationship rendering)
+    
+    # Communications Properties
+    email: List[Email]  # Email addresses with TYPE parameter
+    tel: List[Phone]  # Phone numbers with TYPE parameter
+    impp: List[str]  # Instant messaging addresses
+    lang: List[str]  # Language preferences
+    
+    # Delivery Addressing Properties
+    adr: List[Address]  # Addresses (structured: PO box, ext, street, locality, region, postal, country)
+    
+    # Geographical Properties
+    tz: str  # Time zone
+    geo: Tuple[float, float]  # Geographic position (lat, long)
+    
+    # Organizational Properties
     title: str  # Job title
-    note: str  # Notes
-    # ... other vCard 4.0 fields
+    role: str  # Role or occupation
+    logo: URI  # Organization logo
+    org: List[str]  # Organization (structured: org name, units)
+    member: List[str]  # Group membership (for KIND=group)
+    related: List[Related]  # RELATED - Social graph relationships (cardinality: *)
+    
+    # Explanatory Properties
+    categories: List[str]  # Tags/categories
+    note: str  # Free-form notes
+    prodid: str  # Product ID that created vCard
+    rev: datetime  # Revision timestamp - CRITICAL for merge logic
+    sound: URI  # Pronunciation
+    clientpidmap: dict  # Client PID mapping for synchronization
+    url: List[str]  # URLs
+    
+    # Security Properties
+    key: List[str]  # Public keys
+    
+    # Calendar Properties
+    fburl: str  # Free/busy URL
+    caladruri: str  # Calendar address
+    caluri: str  # Calendar URL
+    
+    # Extended Properties
+    x_properties: dict  # Vendor-specific extensions
 ```
 
-### Relationship
+### Related (vCard 4.0 RELATED Property)
+```python
+class Related:
+    """
+    Represents the vCard 4.0 RELATED property.
+    Used to project the social graph onto vCard representations.
+    """
+    uri: str  # URI reference to related contact (typically urn:uuid:xxx)
+    type: List[str]  # Relationship types (comma-separated in vCard)
+    # Supported TYPE values (from RFC 6350):
+    # Social: contact, acquaintance, friend, met
+    # Professional: co-worker, colleague
+    # Residential: co-resident, neighbor
+    # Family: child, parent, sibling, spouse, kin
+    # Romantic: muse, crush, date, sweetheart
+    # Special: me, agent, emergency
+    text_value: str  # Optional text description (alternative to URI)
+    pref: int  # Preference order (1-100)
+```
+
+### Relationship (Internal Graph Edge)
 ```python
 class Relationship:
-    source: Contact  # Source contact (for directional)
+    """
+    Internal representation of relationship as graph edge.
+    Maps to vCard RELATED property during serialization.
+    """
+    source: Contact  # Source contact
     target: Contact  # Target contact
-    kind: str  # Relationship type (parent, friend, colleague, etc.)
-    directional: bool  # True if relationship has direction
+    types: List[str]  # Relationship types (from vCard RELATED TYPE taxonomy)
+    directional: bool  # True if relationship implies direction (child->parent)
     metadata: dict  # Additional relationship data
+    
+    def to_vcard_related(self) -> Related:
+        """Convert to vCard RELATED property"""
+        
+    @staticmethod
+    def from_vcard_related(source: Contact, related: Related) -> 'Relationship':
+        """Create from vCard RELATED property"""
 ```
 
 ### Graph Structure
-- Nodes: Contact objects
-- Edges: Relationship objects
-- Edge attributes: kind, directional, metadata
+- **Nodes**: Contact objects (vCard entities)
+- **Edges**: Relationship objects (derived from vCard RELATED properties)
+- **Edge attributes**: types (list of vCard RELATED TYPE values), directional, metadata
+- **Serialization**: Graph edges stored as RELATED properties in each Contact's vCard
 
 ## API Specifications
 

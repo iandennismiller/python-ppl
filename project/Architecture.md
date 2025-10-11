@@ -1,18 +1,21 @@
 # Architecture Design
 
 ## System Overview
-PPL uses a graph-based architecture where contacts are nodes and relationships are edges in a NetworkX graph. The graph serves as the single source of truth, with multiple serialization formats (vCard, YAML, Markdown) acting as different views of the same data. The system emphasizes idempotent operations and timestamp-based conflict resolution for reliable data synchronization.
+PPL uses a graph-based architecture where contacts (vCard 4.0 entities) are nodes and relationships are edges in a NetworkX graph. The graph serves as the single source of truth, with the vCard 4.0 RELATED property used to project the social graph onto vCard representations. Multiple serialization formats (vCard, YAML, Markdown) act as different views of the same data. The system emphasizes idempotent operations and timestamp-based conflict resolution (via REV field) for reliable data synchronization.
 
 ## Design Principles
 
 1. **Graph as Source of Truth**: The NetworkX graph is the authoritative data store during runtime
-2. **Standards Compliance**: Full vCard 4.0 compliance for interoperability
-3. **Idempotent Operations**: All import/export operations can be safely repeated
-4. **Timestamp-based Merging**: Use REV field to intelligently merge data
-5. **Separation of Concerns**: Clear boundaries between models, serializers, and filters
-6. **Leverage Existing Libraries**: Minimize custom code by using well-tested libraries
-7. **Extensible Architecture**: Filter pipeline and serializer pattern support future expansion
-8. **Gender Neutrality**: Relationships are gender-neutral with optional gender rendering
+2. **vCard 4.0 Standards Compliance**: Full vCard 4.0 compliance including RELATED property for social graph projection
+3. **RELATED Property for Relationships**: Use vCard 4.0 RELATED property with TYPE parameter to represent graph edges
+4. **vCard Taxonomy Adherence**: Use standard vCard 4.0 relationship types (contact, friend, parent, colleague, etc.)
+5. **Idempotent Operations**: All import/export operations can be safely repeated
+6. **Timestamp-based Merging**: Use vCard 4.0 REV field to intelligently merge data
+7. **UID-based Identification**: Use vCard 4.0 UID property for unique contact identification
+8. **Separation of Concerns**: Clear boundaries between models, serializers, and filters
+9. **Leverage Existing Libraries**: Minimize custom code by using well-tested libraries (vobject, networkx)
+10. **Extensible Architecture**: Filter pipeline and serializer pattern support future expansion
+11. **Gender Neutrality**: Relationships use vCard 4.0 taxonomy which is gender-neutral with optional gender rendering
 
 ## Component Diagram
 
@@ -177,21 +180,87 @@ FilterPipeline -> ImportOrchestrator: filtered_contact
 ## Fault Tolerance
 
 ### Data Integrity
-- REV field prevents overwriting newer data with older data
-- UID ensures unique identification even across systems
+- vCard 4.0 REV field prevents overwriting newer data with older data
+- vCard 4.0 UID ensures unique identification even across systems
+- RELATED properties maintain bidirectional relationship consistency
 - Idempotent operations allow safe retries
 
 ### Error Handling
 - Invalid VCF files logged but don't stop batch import
+- Missing RELATED targets handled gracefully
 - Filter failures logged but don't crash pipeline
-- Graceful degradation when optional fields missing
+- Graceful degradation when optional vCard fields missing
 
 ### Recovery
 - File-based storage allows easy backup/restore
-- Graph can be rebuilt from VCF folder at any time
+- Graph can be rebuilt from VCF folder at any time (including RELATED properties)
 - No data loss on crashes (files remain on disk)
 
+## vCard 4.0 RELATED Property Mapping
+
+### Graph to vCard Projection
+The NetworkX graph is projected onto vCard representations using the RELATED property:
+
+```
+NetworkX Graph Edge:
+  Contact A --[friend, colleague]--> Contact B
+
+Maps to vCard RELATED in Contact A:
+  RELATED;TYPE=friend,colleague:urn:uuid:<Contact B's UID>
+```
+
+### Relationship Type Taxonomy (RFC 6350)
+All relationship types follow vCard 4.0 specification:
+
+**Social Relationships:**
+- `contact` - Someone in contact list
+- `acquaintance` - Known but not close
+- `friend` - Friend relationship
+- `met` - Have met before
+
+**Professional Relationships:**
+- `co-worker` - Works for same organization
+- `colleague` - Professional peer
+
+**Residential Relationships:**
+- `co-resident` - Lives in same residence
+- `neighbor` - Lives nearby
+
+**Family Relationships:**
+- `child` - Child of this contact (directional)
+- `parent` - Parent of this contact (directional)
+- `sibling` - Sibling relationship
+- `spouse` - Married or partnered
+- `kin` - Other family relation
+
+**Romantic Relationships:**
+- `muse` - Artistic inspiration
+- `crush` - Romantic interest
+- `date` - Dating relationship
+- `sweetheart` - Romantic partner
+
+**Special Relationships:**
+- `me` - Self-reference
+- `agent` - Acts on behalf of contact
+- `emergency` - Emergency contact
+
+### Bidirectional Relationship Handling
+- Most relationships are symmetric (friend, colleague, spouse)
+- When Contact A has `RELATED;TYPE=friend` to Contact B, Contact B should have reciprocal RELATED to Contact A
+- System maintains consistency during import/export
+- Directional relationships (parent/child) are one-way
+
+### Multiple Relationship Types
+- vCard 4.0 allows comma-separated TYPE values: `RELATED;TYPE=friend,colleague:urn:uuid:xxx`
+- Single relationship edge can have multiple types
+- Each type is maintained separately in graph metadata
+
 ## Design Trade-offs
+
+### vCard RELATED vs Custom Relationship Storage
+**Decision**: Use vCard 4.0 RELATED property
+**Rationale**: Standards-compliant, interoperable with other vCard systems, built-in taxonomy
+**Trade-off**: Limited to vCard-defined types, but extensible via custom TYPE values
 
 ### NetworkX vs Custom Graph
 **Decision**: Use NetworkX
@@ -200,7 +269,7 @@ FilterPipeline -> ImportOrchestrator: filtered_contact
 
 ### File-based vs Database Storage
 **Decision**: File-based (VCF files)
-**Rationale**: Interoperability, simplicity, no server needed
+**Rationale**: Interoperability, simplicity, no server needed, vCard 4.0 RELATED preserves graph
 **Trade-off**: Less efficient for very large datasets, but suitable for target use case
 
 ### Multiple Serialization Formats
@@ -209,9 +278,9 @@ FilterPipeline -> ImportOrchestrator: filtered_contact
 **Trade-off**: More code to maintain, but provides flexibility
 
 ### Gender-neutral Relationships
-**Decision**: Separate gender from relationship type
-**Rationale**: More inclusive, more accurate modeling
-**Trade-off**: May require more complex rendering logic
+**Decision**: Use vCard 4.0 relationship taxonomy (already gender-neutral)
+**Rationale**: Standards-compliant, inclusive, accurate modeling
+**Trade-off**: May require gender context for rendering (e.g., "parent" -> "mother"/"father")
 
 ### Filter Pipeline
 **Decision**: Extensible filter architecture

@@ -9,7 +9,8 @@ So that I can populate my contact graph from existing vCard data
 ### Acceptance Criteria
 - [ ] System iterates through all *.VCF files in specified folder
 - [ ] Each vCard is parsed and added as a Contact to the graph
-- [ ] If contact already exists (by UID), system checks REV field
+- [ ] RELATED properties are extracted and converted to graph edges
+- [ ] If contact already exists (by vCard UID), system checks REV field
 - [ ] When imported REV is newer, contact data is updated in graph
 - [ ] When imported REV is older or equal, existing data is preserved
 - [ ] Invalid vCard files are logged but don't stop import process
@@ -18,7 +19,7 @@ So that I can populate my contact graph from existing vCard data
 High
 
 ### Notes
-This is the primary method for getting data into the system. Must handle vCard 4.0 specification correctly.
+This is the primary method for getting data into the system. Must handle vCard 4.0 specification correctly, including all RELATED properties for relationship reconstruction.
 
 ---
 
@@ -30,10 +31,11 @@ So that I can use my contacts in other vCard-compatible systems
 
 ### Acceptance Criteria
 - [ ] System exports each Contact as a vCard 4.0 compliant .VCF file
-- [ ] Files are named using the UID field from the contact
+- [ ] Graph edges are projected as RELATED properties in each contact's vCard
+- [ ] Files are named using the vCard UID field from the contact
 - [ ] If destination file already exists, check REV field
 - [ ] Only overwrite if graph has newer data than existing file
-- [ ] All vCard 4.0 required fields are included
+- [ ] All vCard 4.0 required fields are included (FN, VERSION)
 - [ ] Export operation is idempotent (can be run multiple times safely)
 
 ### Priority
@@ -44,25 +46,27 @@ Export must maintain vCard 4.0 compliance for interoperability with other system
 
 ---
 
-## Story 3: Model Contact Relationships
+## Story 3: Model Contact Relationships Using vCard RELATED
 
 As a user
-I want to define relationships between my contacts
-So that I can track how people and organizations are connected
+I want to define relationships between my contacts using the vCard 4.0 RELATED property
+So that I can track how people and organizations are connected in a standards-compliant way
 
 ### Acceptance Criteria
-- [ ] Can create directional relationships (e.g., parent->child)
-- [ ] Can create bidirectional relationships (e.g., friendship, colleagues)
-- [ ] Can specify relationship type/kind
-- [ ] Can have multiple relationships between same two contacts
-- [ ] Relationships are gender-neutral by default
+- [ ] Can create directional relationships using vCard RELATED types (parent->child)
+- [ ] Can create bidirectional relationships (friend, colleague, spouse)
+- [ ] Can specify relationship types from vCard 4.0 taxonomy (18 standard types)
+- [ ] Can have multiple RELATED properties per contact (cardinality: *)
+- [ ] Can specify multiple TYPE values in single RELATED (comma-separated)
+- [ ] Relationships stored as RELATED properties in vCard export
+- [ ] Relationships reconstructed as graph edges from RELATED on import
 - [ ] Can query graph for all relationships of a contact
 
 ### Priority
 High
 
 ### Notes
-Graph-based relationship model is a key differentiator. Must support complex relationship networks.
+vCard 4.0 RELATED property is the key to projecting the social graph onto contact representations. Must support all vCard relationship types: contact, acquaintance, friend, met, co-worker, colleague, co-resident, neighbor, child, parent, sibling, spouse, kin, muse, crush, date, sweetheart, me, agent, emergency.
 
 ---
 
@@ -70,12 +74,12 @@ Graph-based relationship model is a key differentiator. Must support complex rel
 
 As a developer
 I want contacts without UIDs to automatically receive a UUID
-So that all contacts have unique identifiers without manual intervention
+So that all contacts have unique identifiers per vCard 4.0 specification
 
 ### Acceptance Criteria
-- [ ] Filter checks if Contact has UID field populated
-- [ ] If UID is missing, generates new UUID
-- [ ] UUID is assigned to contact's UID field
+- [ ] Filter checks if Contact has vCard UID field populated
+- [ ] If UID is missing, generates new UUID per vCard 4.0 format
+- [ ] UUID is assigned to contact's UID property
 - [ ] Filter can be triggered as part of import pipeline
 - [ ] Filter logs when UIDs are assigned
 

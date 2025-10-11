@@ -5,40 +5,48 @@
 ### Phase 1: Core Data Models and Graph Infrastructure
 **Duration:** 1-2 weeks  
 **Goals:**
-- Establish foundational data structures
+- Establish foundational data structures aligned with vCard 4.0
 - Set up project structure and dependencies
 - Create basic graph operations
 
 **Deliverables:**
 - [x] Project structure with /ppl/models directory
 - [x] pyproject.toml with dependencies (networkx, vobject, pyyaml, marko-py, click)
-- [ ] Contact class with vCard 4.0 field support
-- [ ] Relationship class with directional/bidirectional support
+- [ ] Contact class with all vCard 4.0 properties (FN, N, UID, REV, EMAIL, TEL, ADR, RELATED, etc.)
+- [ ] Related class for vCard 4.0 RELATED property representation
+- [ ] Relationship class for internal graph edge representation
+- [ ] Mapping between RELATED properties and graph edges
 - [ ] Graph manager using NetworkX
 - [ ] Basic unit tests for models
-- [ ] UID and REV field handling
+- [ ] vCard 4.0 UID and REV field handling
 
 **Dependencies:** None
 
 ---
 
-### Phase 2: vCard Import/Export
+### Phase 2: vCard Import/Export with RELATED Properties
 **Duration:** 2-3 weeks  
 **Goals:**
 - Implement vCard 4.0 parsing and generation
+- Handle RELATED properties for social graph projection
 - Implement REV-based merge logic
 - Support single file and bulk operations
 
 **Deliverables:**
 - [ ] /ppl/serializers/vcard.py module
-- [ ] Parse VCF file to Contact object
+- [ ] Parse VCF file to Contact object (all vCard 4.0 properties)
+- [ ] Extract RELATED properties and create graph edges
 - [ ] Generate VCF file from Contact object
+- [ ] Inject RELATED properties from graph edges during export
+- [ ] Support all 18 vCard 4.0 RELATED TYPE values
+- [ ] Handle multiple TYPE values in single RELATED property
 - [ ] REV comparison logic for conflict resolution
-- [ ] bulk_import_vcards(folder) function
-- [ ] bulk_export_vcards(contacts, folder) function
-- [ ] Smart overwrite logic (only when graph is newer)
+- [ ] bulk_import_vcards(folder) function with relationship reconstruction
+- [ ] bulk_export_vcards(contacts, folder) function with RELATED projection
+- [ ] Smart overwrite logic (only when graph REV is newer)
 - [ ] Unit tests for vCard serializer
-- [ ] Integration tests for import/export cycle
+- [ ] Unit tests for RELATED property handling
+- [ ] Integration tests for import/export cycle with relationships
 
 **Dependencies:** Phase 1 complete
 

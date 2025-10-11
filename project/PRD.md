@@ -30,19 +30,28 @@ Contact management systems often treat contacts in isolation, failing to capture
 ### Functional Requirements
 
 #### Core Data Model
-- **Contact**: Fundamental class representing a person or organization with contact details
+- **Contact**: Fundamental class representing a person or organization with contact details (vCard 4.0 entity)
 - **Relationship**: Model connections between contacts with directional and bidirectional support
-- **Relationship Types**: Support for various relationship kinds (parent-child, friendship, colleague, etc.)
-- **Multiple Relationships**: Allow multiple relationships between two contacts
-- **Gender-neutral Relationships**: Separate gender information from relationship types
+- **vCard RELATED Field**: Use the vCard 4.0 RELATED property to project the social graph onto contact representations
+- **Relationship Types**: Support all vCard 4.0 defined relationship types:
+  - Social: contact, acquaintance, friend, met
+  - Professional: co-worker, colleague
+  - Residential: co-resident, neighbor
+  - Family: child, parent, sibling, spouse, kin
+  - Romantic: muse, crush, date, sweetheart
+  - Special: me, agent, emergency
+- **Multiple Relationships**: Allow multiple RELATED properties per contact (cardinality: *)
+- **Gender-neutral Relationships**: Separate gender information from relationship types (aligned with vCard 4.0)
 
 #### Import/Export
-- **vCard Import**: Parse vCard 4.0 files and add/update contacts in graph
-- **vCard Export**: Generate vCard 4.0 compliant .VCF files from graph
+- **vCard Import**: Parse vCard 4.0 files including RELATED properties and add/update contacts in graph
+- **vCard Export**: Generate vCard 4.0 compliant .VCF files with RELATED properties from graph
+- **Social Graph Projection**: Use RELATED field to represent the NetworkX graph in vCard format
 - **YAML Import/Export**: Support standard YAML serialization
 - **Flat YAML**: Support flattened YAML with unnested namespace
 - **Markdown Import/Export**: Use Markdown DOM for contact representation
-- **REV-based Merging**: Use vCard 4.0 REV field to determine data freshness
+- **REV-based Merging**: Use vCard 4.0 REV field (timestamp) to determine data freshness and merge conflicts
+- **UID Field**: Use vCard 4.0 UID field for unique contact identification
 - **Idempotent Operations**: Import/export operations should be repeatable without data loss
 
 #### Bulk Operations
