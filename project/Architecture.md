@@ -559,9 +559,34 @@ Both representations map to the same graph structure, allowing seamless conversi
 **Trade-off**: May require gender context for rendering (e.g., "parent" -> "mother"/"father")
 
 ### Filter Pipeline
-**Decision**: Extensible filter architecture
-**Rationale**: Future-proof for data curation needs
-**Trade-off**: More complex than simple validation, but provides flexibility
+**Decision**: Extensible, composable filter architecture with abstract base class  
+**Rationale**: 
+- Future-proof for data curation needs
+- Enables plugin-like extensibility
+- Supports multiple pipeline instances for different scenarios
+- Provides consistent interface through AbstractFilter base class
+- Chain of Responsibility pattern enables independent filter development
+
+**Architecture:**
+- **AbstractFilter**: Base class defining filter contract (priority, execute, should_run)
+- **FilterPipeline**: Orchestrates filter execution in priority order
+- **Multiple Pipelines**: import_pipeline, export_pipeline, curation_pipeline
+- **FilterContext**: Carries pipeline-specific data (folder_path, graph, metadata)
+- **Composability**: Filters can be combined, reused across pipelines
+
+**Built-in Filters:**
+1. **UID Assignment Filter** (priority=10): Ensures all contacts have UIDs
+2. **Gender Inference Filter** (priority=50): Infers GENDER from relationship terms in markdown
+
+**Gender Inference Filter Details:**
+- Examines markdown Related section for gendered relationship terms
+- Maps terms to GENDER property: mother/father/sister/brother → F/M
+- Dereferences wiki-style links to update target contact's GENDER
+- Updates markdown front matter with inferred GENDER: `GENDER: F` or `GENDER: M`
+- Only infers when term clearly indicates gender (parent/sibling/spouse remain neutral)
+- Logs all gender inferences for review
+
+**Trade-off**: More complex than simple validation, but provides crucial extensibility and composability
 
 ### CLI-first Approach
 **Decision**: Start with CLI using Click

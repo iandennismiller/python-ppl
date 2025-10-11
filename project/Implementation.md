@@ -52,22 +52,33 @@
 
 ---
 
-### Phase 3: Filter Pipeline
-**Duration:** 1 week  
+### Phase 3: Filter Pipeline and Models
+**Duration:** 1-2 weeks  
 **Goals:**
-- Create extensible filter framework
-- Implement UID assignment filter
+- Create extensible filter framework with abstract base class
+- Implement composable pipeline architecture
+- Build UID assignment filter
+- Build gender inference filter
 - Integrate with import process
 
 **Deliverables:**
 - [ ] /ppl/filters/ directory structure
-- [ ] Filter pipeline framework
-- [ ] Filter registration system (priority-based)
-- [ ] UID assignment filter
-- [ ] Pipeline trigger points (import, on-demand)
-- [ ] Logging for filter actions
-- [ ] Unit tests for pipeline
+- [ ] /ppl/models/filter.py - AbstractFilter base class
+- [ ] /ppl/models/pipeline.py - FilterPipeline and FilterContext classes
+- [ ] Filter pipeline framework with priority-based execution
+- [ ] Filter registration system
+- [ ] Multiple pipeline instances (import_pipeline, export_pipeline, curation_pipeline)
+- [ ] /ppl/filters/uid_filter.py - UID assignment filter (priority=10)
+- [ ] /ppl/filters/gender_filter.py - Gender inference filter (priority=50)
+- [ ] Gender term mapping (mother/father/sister/brother/etc → M/F)
+- [ ] Wiki-link dereferencing for gender updates
+- [ ] Markdown front matter update with GENDER property
+- [ ] Pipeline trigger points (import, export, on-demand)
+- [ ] Logging for filter actions and gender inferences
+- [ ] Unit tests for AbstractFilter and FilterPipeline
 - [ ] Unit tests for UID filter
+- [ ] Unit tests for gender filter
+- [ ] Integration tests for pipeline composition
 
 **Dependencies:** Phase 1 complete
 

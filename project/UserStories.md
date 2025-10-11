@@ -229,22 +229,53 @@ Starting point for user interaction. May expand to GUI later.
 ## Story 8: Filter Pipeline Execution
 
 As a developer
-I want to run filters on contact data at various trigger points
+I want to run composable filters on contact data at various trigger points
 So that I can validate and curate information in the graph
 
 ### Acceptance Criteria
+- [ ] AbstractFilter base class defines filter contract
+- [ ] FilterPipeline orchestrates filter execution by priority
+- [ ] Multiple pipeline instances (import, export, curation)
 - [ ] Filter pipeline can be triggered programmatically
-- [ ] Filters execute in defined order
+- [ ] Filters execute in priority order (lower priority runs first)
+- [ ] FilterContext carries pipeline-specific data
 - [ ] Can trigger pipeline during import
+- [ ] Can trigger pipeline during export
 - [ ] Can trigger pipeline on-demand
 - [ ] Each filter logs its actions
-- [ ] Failed filters don't crash pipeline
+- [ ] Failed filters don't crash pipeline (error handling)
+- [ ] Filters are composable and reusable across pipelines
+
+### Priority
+High
+
+### Notes
+Extensible architecture for data quality. Foundation for future data curation features. Chain of Responsibility pattern enables independent filter development.
+
+---
+
+## Story 8A: Gender Inference from Relationships
+
+As a user
+I want gender information to be inferred from gendered relationship terms
+So that contact records are automatically enriched with gender data
+
+### Acceptance Criteria
+- [ ] Gender filter examines markdown Related section
+- [ ] Detects gendered relationship terms (mother, father, sister, brother, uncle, aunt, etc.)
+- [ ] Infers GENDER property from terms (mother/sister/aunt → F, father/brother/uncle → M)
+- [ ] Dereferences wiki-style links to find target contact
+- [ ] Updates target contact's markdown front matter with GENDER property
+- [ ] Only infers when term clearly indicates gender
+- [ ] Gender-neutral terms (parent, sibling, spouse) don't trigger inference
+- [ ] All inferences logged for review
+- [ ] Filter runs in curation pipeline (priority=50)
 
 ### Priority
 Medium
 
 ### Notes
-Extensible architecture for data quality. Foundation for future data curation features.
+Example: If contact has `- mother [[Jane Doe]]` in Related section, system infers Jane Doe's GENDER=F and updates her markdown file front matter.
 
 ---
 

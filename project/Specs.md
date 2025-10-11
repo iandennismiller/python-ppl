@@ -56,6 +56,102 @@ PPL is a Python application with a graph-based architecture for managing contact
 - Get relationship type
 - Render with optional gender context
 
+### Component 3A: Filter Model (/ppl/models/filter.py)
+**Purpose:** Abstract base class and model for data curation filters  
+**Responsibilities:**
+- Define filter interface with execute() method
+- Provide priority-based ordering mechanism
+- Support context-aware execution
+- Enable filter composition
+- Log filter execution and results
+
+**Dependencies:** abc (Python standard library)  
+**Classes:**
+```python
+@dataclass
+class FilterContext:
+    """Context passed to filters during execution"""
+    pipeline_name: str
+    folder_path: Optional[str] = None
+    graph: Optional[ContactGraph] = None
+    metadata: dict = field(default_factory=dict)
+
+class AbstractFilter(ABC):
+    """Base class for all curation filters"""
+    
+    @property
+    @abstractmethod
+    def priority(self) -> int:
+        """Execution priority (lower = earlier)"""
+        pass
+    
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Filter name for logging"""
+        pass
+    
+    @abstractmethod
+    def execute(self, contact: Contact, context: FilterContext) -> Contact:
+        """Execute filter logic, return modified contact"""
+        pass
+    
+    def should_run(self, context: FilterContext) -> bool:
+        """Determine if filter should run in context (default: True)"""
+        return True
+    
+    def on_error(self, contact: Contact, error: Exception) -> None:
+        """Handle filter execution errors"""
+        pass
+```
+
+### Component 3B: Pipeline Model (/ppl/models/pipeline.py)
+**Purpose:** Composable pipeline for orchestrating filters  
+**Responsibilities:**
+- Manage collection of filters
+- Execute filters in priority order
+- Support multiple pipeline instances for different scenarios
+- Provide trigger points (import, export, curation)
+- Handle filter errors gracefully
+- Log pipeline execution
+
+**Dependencies:** logging (Python standard library)  
+**Classes:**
+```python
+class FilterPipeline:
+    """Composable pipeline of filters"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.filters: List[AbstractFilter] = []
+        self.logger = logging.getLogger(f"pipeline.{name}")
+    
+    def register(self, filter: AbstractFilter) -> None:
+        """Register filter and maintain priority order"""
+        self.filters.append(filter)
+        self.filters.sort(key=lambda f: f.priority)
+    
+    def run(self, contact: Contact, context: FilterContext) -> Contact:
+        """Execute all applicable filters in order"""
+        for filter in self.filters:
+            if filter.should_run(context):
+                try:
+                    contact = filter.execute(contact, context)
+                except Exception as e:
+                    filter.on_error(contact, e)
+                    self.logger.error(f"{filter.name} failed: {e}")
+        return contact
+    
+    def run_batch(self, contacts: List[Contact], context: FilterContext) -> List[Contact]:
+        """Execute pipeline on multiple contacts"""
+        return [self.run(contact, context) for contact in contacts]
+
+# Standard pipeline instances
+import_pipeline = FilterPipeline("import")
+export_pipeline = FilterPipeline("export")
+curation_pipeline = FilterPipeline("curation")
+```
+
 ### Component 4: vCard Importer/Exporter (/ppl/serializers/vcard.py)
 **Purpose:** Handle vCard 4.0 format import/export with RELATED properties  
 **Responsibilities:**
@@ -121,19 +217,54 @@ PPL is a Python application with a graph-based architecture for managing contact
 - resolve_wiki_link(link_text, folder_path) -> Contact
 
 ### Component 7: Filter Pipeline (/ppl/filters/)
-**Purpose:** Extensible data validation and curation  
+**Purpose:** Extensible data validation and curation with composable architecture  
 **Responsibilities:**
-- Execute filters in defined order
+- Execute filters in defined order based on priority
+- Support multiple pipelines for different scenarios
 - Provide hooks for various trigger points
 - Log filter actions
 - Handle filter failures gracefully
+- Enable filter composition and chaining
 
-**Dependencies:** None (framework)  
+**Dependencies:** abc (Python standard library)  
 **Interfaces:**
-- register_filter(filter_func, priority)
-- run_pipeline(contact) -> Contact
-- trigger_on_import()
-- trigger_on_demand()
+- FilterPipeline class with register_filter(), run(), trigger points
+- AbstractFilter base class for all filters
+- Multiple pipeline instances (import_pipeline, export_pipeline, curation_pipeline)
+
+**Classes:**
+```python
+class AbstractFilter(ABC):
+    """Base class for all filters"""
+    @property
+    @abstractmethod
+    def priority(self) -> int:
+        """Filter execution priority (lower runs first)"""
+        pass
+    
+    @abstractmethod
+    def execute(self, contact: Contact, context: dict) -> Contact:
+        """Execute filter logic"""
+        pass
+    
+    def should_run(self, context: dict) -> bool:
+        """Determine if filter should run in given context"""
+        return True
+
+class FilterPipeline:
+    """Composable pipeline of filters"""
+    def __init__(self, name: str):
+        self.name = name
+        self.filters = []
+    
+    def register(self, filter: AbstractFilter) -> None:
+        """Register filter and sort by priority"""
+        pass
+    
+    def run(self, contact: Contact, context: dict = None) -> Contact:
+        """Execute all filters in order"""
+        pass
+```
 
 ### Component 8: UID Assignment Filter (/ppl/filters/uid_filter.py)
 **Purpose:** Ensure all contacts have unique identifiers  
@@ -142,9 +273,34 @@ PPL is a Python application with a graph-based architecture for managing contact
 - Generate UUID when UID missing
 - Log UID assignments
 
+**Base Class:** AbstractFilter  
+**Priority:** 10 (runs early)  
 **Dependencies:** uuid (Python standard library)  
 **Interfaces:**
-- execute(contact) -> Contact
+- execute(contact, context) -> Contact
+
+### Component 8A: Gender Inference Filter (/ppl/filters/gender_filter.py)
+**Purpose:** Infer gender information from relationship terms in markdown  
+**Responsibilities:**
+- Parse relationship terms from markdown Related section
+- Detect gendered relationship terms (mother, father, sister, brother, uncle, aunt, etc.)
+- Infer GENDER property from gendered terms
+- Dereference wiki-style links to update related contact's GENDER in front matter
+- Update target contact's markdown file with inferred GENDER
+- Log gender inference actions
+
+**Base Class:** AbstractFilter  
+**Priority:** 50 (runs after basic validation)  
+**Dependencies:** marko-py (for markdown parsing)  
+**Interfaces:**
+- execute(contact, context) -> Contact
+- infer_gender_from_term(relationship_term: str) -> Optional[str]
+- update_contact_gender(contact_uid: str, gender: str, folder_path: str) -> None
+
+**Gender Term Mapping:**
+- Mother, grandmother, daughter, granddaughter, sister, aunt, niece, wife → F (female)
+- Father, grandfather, son, grandson, brother, uncle, nephew, husband → M (male)
+- Parent, child, sibling, spouse, cousin, partner → No inference (gender-neutral)
 
 ### Component 9: CLI Interface (/ppl/cli.py)
 **Purpose:** Command-line interface for user interaction  

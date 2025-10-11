@@ -68,9 +68,15 @@ Contact management systems often treat contacts in isolation, failing to capture
 - **YAML Front Matter**: Include vCard 4.0 properties as YAML in Markdown files between `---` delimiters (e.g., FN, UID, EMAIL, TEL)
 
 #### Data Curation
-- **Filter Pipeline**: Extensible queue for data validation and curation
-- **UID Assignment Filter**: Check contacts for UID field and assign UUID if missing
-- **Trigger Options**: Run filters at various lifecycle points
+- **Filter Pipeline**: Extensible, composable architecture for data validation and curation
+- **AbstractFilter Base Class**: Defines filter contract (priority, execute, should_run)
+- **Multiple Pipelines**: import_pipeline, export_pipeline, curation_pipeline for different scenarios
+- **UID Assignment Filter**: Check contacts for UID field and assign UUID if missing (priority=10)
+- **Gender Inference Filter**: Infer GENDER property from gendered relationship terms in markdown (priority=50)
+- **Gender Term Detection**: Detect mother/father/sister/brother/aunt/uncle → infer F/M gender
+- **Wiki-link Dereferencing**: Update target contact's markdown file with inferred GENDER
+- **Composable Architecture**: Filters can be combined, reused, and independently developed
+- **Trigger Options**: Run filters at various lifecycle points (import, export, on-demand)
 
 #### User Interface
 - **Command-line Interface**: Use Click for minimal CLI
