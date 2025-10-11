@@ -167,11 +167,42 @@
 - [ ] `ppl search` command (search contacts)
 - [ ] `ppl show <uid>` command (display single contact)
 - [ ] `ppl filter` command (run filter pipeline)
+- [ ] `ppl check-consistency` command (run consistency checks)
 - [ ] Help documentation for all commands
 - [ ] Error handling and user-friendly messages
 - [ ] CLI integration tests
 
 **Dependencies:** Phases 2, 3 complete
+
+---
+
+### Phase 6A: Consistency Service
+**Duration:** 1 week  
+**Goals:**
+- Detect inconsistencies across data representations
+- Generate detailed consistency reports
+- Lay foundation for future repair capabilities
+
+**Deliverables:**
+- [ ] /ppl/services/ directory structure
+- [ ] /ppl/services/consistency.py module
+- [ ] ConsistencyService class
+- [ ] Inconsistency dataclass with type, source, target, details
+- [ ] ConsistencyReport dataclass with aggregated results
+- [ ] check_graph_vcf_consistency() - compare graph with VCF folder
+- [ ] check_graph_markdown_consistency() - compare graph with Markdown folder
+- [ ] check_front_matter_content_consistency() - validate YAML vs content
+- [ ] check_all_representations() - comprehensive cross-check
+- [ ] generate_report() - human-readable consistency report
+- [ ] Inconsistency detection: missing, outdated, conflict, orphaned
+- [ ] REV timestamp comparison logic
+- [ ] RELATED property validation across representations
+- [ ] CLI integration: `ppl check-consistency` command
+- [ ] Unit tests for ConsistencyService
+- [ ] Integration tests with sample inconsistent data
+- [ ] Documentation for consistency checking workflow
+
+**Dependencies:** Phases 2, 4, 5 complete
 
 ---
 

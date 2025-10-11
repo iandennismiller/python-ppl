@@ -317,6 +317,57 @@ class FilterPipeline:
 - list_command()
 - search_command(query)
 
+### Component 10: Consistency Service (/ppl/services/consistency.py)
+**Purpose:** Detect and report inconsistencies across data representations  
+**Responsibilities:**
+- Compare Contact data in NetworkX graph vs VCF files vs Markdown files
+- Validate YAML front matter consistency with Markdown content
+- Detect discrepancies in REV timestamps across representations
+- Report missing or orphaned contacts/relationships
+- Generate consistency reports with detailed inconsistency descriptions
+- Support future consistency repair via filter pipelines
+
+**Dependencies:** NetworkX graph, vCard serializer, Markdown parser, YAML parser  
+**Interfaces:**
+```python
+class ConsistencyService:
+    def check_graph_vcf_consistency(graph: ContactGraph, vcf_folder: str) -> ConsistencyReport
+    def check_graph_markdown_consistency(graph: ContactGraph, md_folder: str) -> ConsistencyReport
+    def check_front_matter_content_consistency(md_file: str) -> List[Inconsistency]
+    def check_all_representations(graph: ContactGraph, vcf_folder: str, md_folder: str) -> ConsistencyReport
+    def generate_report(report: ConsistencyReport) -> str
+
+@dataclass
+class Inconsistency:
+    type: str  # "missing", "outdated", "conflict", "orphaned"
+    source: str  # "graph", "vcf", "markdown_frontmatter", "markdown_content"
+    target: str  # which representation has the issue
+    contact_uid: str
+    field: str
+    message: str
+    graph_value: Any
+    file_value: Any
+
+@dataclass  
+class ConsistencyReport:
+    timestamp: datetime
+    total_contacts: int
+    inconsistencies: List[Inconsistency]
+    is_consistent: bool
+```
+
+**Inconsistency Types:**
+- **Missing**: Contact exists in graph but not in VCF/Markdown folder
+- **Outdated**: REV timestamp differs between representations
+- **Conflict**: Same property has different values across representations
+- **Orphaned**: VCF/Markdown file exists but contact not in graph
+- **Front Matter Mismatch**: YAML front matter contradicts Markdown content
+
+**Future Enhancement:**
+- Configure repair pipelines to automatically resolve inconsistencies
+- Apply filters to bring system to consistent state
+- Support selective repair (e.g., "trust graph", "trust VCF", "trust Markdown")
+
 ## Data Models
 
 ### Contact (vCard 4.0 Entity)

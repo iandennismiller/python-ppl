@@ -78,9 +78,22 @@ Contact management systems often treat contacts in isolation, failing to capture
 - **Composable Architecture**: Filters can be combined, reused, and independently developed
 - **Trigger Options**: Run filters at various lifecycle points (import, export, on-demand)
 
+#### Data Consistency
+- **Consistency Service**: Detect inconsistencies across multiple data representations
+- **Multi-Representation Architecture**: Graph, VCF files, Markdown files, YAML front matter, Markdown content
+- **Inconsistency Detection**: Identify missing, outdated, conflicting, and orphaned data
+- **Consistency Checks**: 
+  - Graph ↔ VCF consistency (REV timestamps, RELATED properties, file existence)
+  - Graph ↔ Markdown consistency (FN-based files, front matter, Related section)
+  - Front matter ↔ Content consistency (YAML vs human-readable content)
+- **Consistency Reports**: Detailed reports showing all discrepancies with actionable messages
+- **Consistency Command**: `ppl check-consistency` to validate system state
+- **Future Enhancement**: Repair pipelines to automatically resolve inconsistencies with configurable strategies
+
 #### User Interface
 - **Command-line Interface**: Use Click for minimal CLI
 - **Contact Rendering**: Display contacts in human-readable Markdown format
+- **Consistency Checking**: Command to detect and report data inconsistencies
 
 ### Non-Functional Requirements
 

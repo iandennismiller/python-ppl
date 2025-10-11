@@ -296,3 +296,43 @@ Low
 
 ### Notes
 Important for inclusivity. Separate gender from relationship structure.
+
+---
+
+## Story 10: Consistency Checking Across Representations
+
+As a user
+I want to detect inconsistencies between graph, VCF files, and Markdown files
+So that I can identify and resolve data discrepancies
+
+### Acceptance Criteria
+- [ ] Can run consistency check command: `ppl check-consistency`
+- [ ] Detects missing contacts (in graph but not in files, or vice versa)
+- [ ] Detects outdated representations (REV timestamp mismatches)
+- [ ] Detects conflicts (same property with different values)
+- [ ] Detects orphaned files (files without corresponding graph nodes)
+- [ ] Validates YAML front matter consistency with Markdown content
+- [ ] Validates RELATED properties match across all representations
+- [ ] Generates detailed consistency report with all inconsistencies
+- [ ] Report shows: type, source, target, contact UID, field, and values
+- [ ] Report indicates whether system is in consistent state
+- [ ] Each inconsistency includes actionable message
+
+### Priority
+High
+
+### Notes
+Foundation for data quality and future automated repair. Critical for maintaining multi-representation architecture integrity.
+
+**Example Inconsistencies:**
+- Contact exists in graph but VCF file missing
+- VCF REV=2024-01-15 but graph REV=2024-01-14
+- Email in YAML front matter differs from graph
+- Related section has "friend [[Bob]]" but no RELATED;TYPE=friend in front matter
+- Markdown file "John Smith.md" exists but no contact with FN="John Smith" in graph
+
+**Future Enhancement:**
+- Configure repair pipelines to automatically resolve inconsistencies
+- Support resolution strategies: "trust graph", "trust files", "newest REV"
+- Selective repair by inconsistency type
+

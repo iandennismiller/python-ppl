@@ -164,6 +164,91 @@ FilterPipeline -> ImportOrchestrator: filtered_contact
 - Orchestrators hide complexity of import/export logic
 - Users interact with simple commands, not internal components
 
+### Service Layer Pattern
+- ConsistencyService provides cross-cutting concern (consistency checking)
+- Coordinates multiple serializers and graph to detect discrepancies
+- Separates consistency logic from individual components
+- Enables future consistency repair through filter pipelines
+
+## Consistency Architecture
+
+### Consistency Service Design
+
+The ConsistencyService provides a critical cross-cutting capability to detect when the system's multiple data representations diverge:
+
+#### Representations to Compare:
+1. **NetworkX Graph** - The source of truth for contact relationships
+2. **VCF Files** - vCard 4.0 serialization in filesystem (named by UID)
+3. **Markdown Files** - Human-readable format (named by FN)
+4. **YAML Front Matter** - Machine-readable metadata within Markdown
+5. **Markdown Content** - Human-readable content including Related section
+
+#### Consistency Checks:
+
+**Graph ↔ VCF Consistency:**
+- Every contact in graph should have corresponding VCF file
+- VCF file's REV should match graph contact's REV
+- RELATED properties in VCF should match graph edges
+- Orphaned VCF files (no graph node) reported
+
+**Graph ↔ Markdown Consistency:**
+- Every contact in graph should have corresponding .md file (by FN)
+- Markdown front matter REV should match graph REV
+- Related section should match graph edges
+- Orphaned Markdown files reported
+
+**Front Matter ↔ Content Consistency:**
+- RELATED properties in YAML should correspond to Related section entries
+- FN in front matter should match heading in content
+- Contact properties should be reflected in human-readable content
+
+#### Inconsistency Types:
+
+```python
+# Missing: Contact in graph, no file representation
+Inconsistency(type="missing", source="graph", target="vcf", 
+              contact_uid="...", message="Contact in graph but no VCF file")
+
+# Outdated: REV timestamp mismatch
+Inconsistency(type="outdated", source="graph", target="vcf",
+              contact_uid="...", field="REV", 
+              graph_value="2024-01-15T10:00:00Z",
+              file_value="2024-01-14T08:00:00Z")
+
+# Conflict: Different values for same property
+Inconsistency(type="conflict", source="graph", target="markdown_frontmatter",
+              contact_uid="...", field="EMAIL",
+              graph_value="new@email.com",
+              file_value="old@email.com")
+
+# Orphaned: File exists but contact not in graph
+Inconsistency(type="orphaned", source="vcf", target="graph",
+              contact_uid="...", message="VCF file has no graph node")
+```
+
+#### Future: Repair Pipelines
+
+Consistency checking lays foundation for automated repair:
+- **Repair Pipeline**: Special filter pipeline to resolve inconsistencies
+- **Resolution Strategies**: "trust graph", "trust files", "newest REV", "manual"
+- **Incremental Repair**: Fix specific inconsistency types
+- **Audit Trail**: Log all repairs for review
+
+Example repair workflow:
+```python
+# Detect inconsistencies
+report = consistency_service.check_all_representations(graph, vcf_folder, md_folder)
+
+# Configure repair pipeline with strategy
+repair_pipeline = FilterPipeline("repair")
+repair_pipeline.register(TrustGraphRepairFilter(strategy="trust_graph"))
+repair_pipeline.register(OrphanCleanupFilter())
+
+# Apply repairs
+for inconsistency in report.inconsistencies:
+    repair_pipeline.run(contact, context={"inconsistency": inconsistency})
+```
+
 ## Scalability Considerations
 
 ### Current Design (Phase 1)
