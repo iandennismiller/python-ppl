@@ -319,21 +319,34 @@ Markdown files contain both YAML front matter and Markdown content:
 # YAML Front Matter (vCard 4.0 properties in YAML format)
 FN: First Last
 UID: urn:uuid:12345678-1234-1234-1234-123456789abc
-EMAIL: first.last@example.com
+EMAIL:
+  - first.last@example.com
+  - f.last@personal.com
 TEL: +1-555-0100
-RELATED;TYPE=parent: urn:uuid:abcd1234-5678-90ab-cdef-0123456789ab
-RELATED;TYPE=friend: urn:uuid:bcde2345-6789-01bc-def0-123456789abc
+ADR:
+  - ;;456 Elm St;Austin;TX;78701;USA
+RELATED;TYPE=parent:
+  - urn:uuid:abcd1234-5678-90ab-cdef-0123456789ab
+RELATED;TYPE=friend:
+  - urn:uuid:bcde2345-6789-01bc-def0-123456789abc
+  - urn:uuid:cdef3456-789a-01bc-def0-23456789abcd
 ---
 
 # First Last
 
-Email: first.last@example.com
+Email: first.last@example.com, f.last@personal.com
 Phone: +1-555-0100
+
+## Address
+
+456 Elm St  
+Austin, TX 78701
 
 ## Related
 
 - parent [[Mary Last]]
 - friend [[Bob Johnson]]
+- friend [[Alice Chen]]
 ```
 
 #### YAML Front Matter
@@ -342,8 +355,8 @@ Phone: +1-555-0100
 - **Content**: All vCard 4.0 properties from Contact object
 - **Property Names**: Must match vCard 4.0 specification exactly (uppercase preferred)
 - **Complex Properties**: Serialized as vCard-compliant strings (e.g., ADR: `;;street;locality;region;postal;country`)
-- **RELATED Properties**: Include TYPE parameter (e.g., `RELATED;TYPE=parent: urn:uuid:...`)
-- **Multiple RELATED**: Each relationship listed as separate RELATED property
+- **Multiple Values**: Properties with multiple instances (EMAIL, TEL, ADR, RELATED) use YAML arrays
+- **RELATED Properties**: Include TYPE parameter, group by type using arrays (e.g., `RELATED;TYPE=friend: [urn:uuid:..., urn:uuid:...]`)
 - **Purpose**: Machine-readable representation for easy parsing
 
 #### Markdown Content

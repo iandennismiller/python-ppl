@@ -107,6 +107,8 @@
 - [ ] /ppl/serializers/markdown.py module
 - [ ] YAML front matter support with `---` delimiters
 - [ ] vCard 4.0 property serialization in YAML front matter (FN, UID, EMAIL, TEL, etc.)
+- [ ] Handle multiple values as YAML arrays (EMAIL, TEL, ADR, RELATED with same TYPE)
+- [ ] Sort array values for deterministic output
 - [ ] parse_yaml_front_matter(markdown_str) function
 - [ ] render_yaml_front_matter(contact) function
 - [ ] to_markdown(contact) function with YAML front matter + content
@@ -115,6 +117,7 @@
 - [ ] Support wiki-style links `[[Name]]` for related contacts
 - [ ] from_markdown(markdown_str) using marko DOM
 - [ ] Parse YAML front matter (precedence over Markdown content)
+- [ ] Parse YAML arrays for multi-valued properties
 - [ ] Parse "Related" section (case-insensitive heading detection)
 - [ ] Extract relationship tuples `(relationship_kind, object)`
 - [ ] Resolve wiki-style links to "Contact Name.md" in folder
@@ -125,6 +128,7 @@
 - [ ] Create graph edges from parsed relationships
 - [ ] Markdown template design with front matter and "Related" section
 - [ ] Unit tests for YAML front matter parsing/rendering
+- [ ] Unit tests for array-valued properties
 - [ ] Unit tests for Markdown serializer
 - [ ] Unit tests for relationship parsing/rendering
 - [ ] Unit tests for wiki-link resolution

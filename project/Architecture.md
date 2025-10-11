@@ -375,30 +375,47 @@ Markdown files combine YAML front matter with Markdown content:
 FN: John Smith
 UID: urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890
 REV: 2024-10-11T12:00:00Z
-EMAIL: john.smith@example.com
-TEL: +1-555-0123
-ADR: ;;123 Main St;Springfield;IL;62701;USA
+EMAIL:
+  - john.smith@example.com
+  - j.smith@personal.com
+TEL:
+  - +1-555-0123
+  - +1-555-0199
+ADR:
+  - ;;123 Main St;Springfield;IL;62701;USA
+  - ;;456 Oak Ave;Portland;OR;97201;USA
 ORG: Acme Corp
 TITLE: Software Engineer
-RELATED;TYPE=parent: urn:uuid:b2c3d4e5-f678-9012-3456-789abcdef012
-RELATED;TYPE=parent: urn:uuid:c3d4e5f6-7890-1234-5678-90abcdef0123
-RELATED;TYPE=sibling: urn:uuid:d4e5f678-9012-3456-789a-bcdef0123456
-RELATED;TYPE=spouse: urn:uuid:e5f67890-1234-5678-90ab-cdef01234567
-RELATED;TYPE=friend: urn:uuid:f6789012-3456-789a-bcde-f01234567890
-RELATED;TYPE=colleague: urn:uuid:01234567-89ab-cdef-0123-456789abcdef
+RELATED;TYPE=parent:
+  - urn:uuid:b2c3d4e5-f678-9012-3456-789abcdef012
+  - urn:uuid:c3d4e5f6-7890-1234-5678-90abcdef0123
+RELATED;TYPE=sibling:
+  - urn:uuid:d4e5f678-9012-3456-789a-bcdef0123456
+RELATED;TYPE=spouse:
+  - urn:uuid:e5f67890-1234-5678-90ab-cdef01234567
+RELATED;TYPE=friend:
+  - urn:uuid:f6789012-3456-789a-bcde-f01234567890
+  - urn:uuid:0123abcd-4567-89ef-0123-456789abcdef
+RELATED;TYPE=colleague:
+  - urn:uuid:01234567-89ab-cdef-0123-456789abcdef
 ---
 
 # John Smith
 
-**Email:** john.smith@example.com  
-**Phone:** +1-555-0123  
+**Email:** john.smith@example.com, j.smith@personal.com  
+**Phone:** +1-555-0123, +1-555-0199  
 **Organization:** Acme Corp  
 **Title:** Software Engineer
 
-## Address
+## Addresses
 
+**Work:**  
 123 Main St  
 Springfield, IL 62701
+
+**Home:**  
+456 Oak Ave  
+Portland, OR 97201
 
 ## Related
 
@@ -407,6 +424,7 @@ Springfield, IL 62701
 - sibling [[Jane Smith]]
 - spouse [[Emily Johnson]]
 - friend [[Bob Wilson]]
+- friend [[Charlie Davis]]
 - colleague [[Alice Brown]]
 ```
 
@@ -417,10 +435,18 @@ Springfield, IL 62701
 **Format**: Flat YAML with vCard 4.0 property names
 - All vCard 4.0 property names used as keys (FN, UID, REV, EMAIL, TEL, ADR, RELATED, etc.)
 - Complex properties like ADR serialized as vCard-compliant strings: `;;street;locality;region;postal;country`
-- RELATED properties include TYPE parameter: `RELATED;TYPE=parent: urn:uuid:...`
-- Multiple RELATED properties list each relationship separately
-- Array values serialized as YAML lists
-- Example: Multiple emails → `EMAIL: [primary@example.com, secondary@example.com]`
+- **Multiple Values**: Properties with cardinality `*` (EMAIL, TEL, ADR, RELATED, etc.) serialized as YAML arrays when multiple values exist
+- **RELATED with TYPE**: Group multiple relationships by TYPE using arrays: `RELATED;TYPE=friend: [urn:uuid:..., urn:uuid:...]`
+- **Single vs Multiple**: Single values can be scalar or single-item array; multiple values must be arrays
+- Array format:
+  ```yaml
+  EMAIL:
+    - john@example.com
+    - john@work.com
+  RELATED;TYPE=friend:
+    - urn:uuid:abc123...
+    - urn:uuid:def456...
+  ```
 - Property names follow vCard 4.0 specification exactly
 
 **Delimiters**: 
