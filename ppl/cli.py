@@ -30,15 +30,17 @@ def cli():
 @click.argument('graph_file', type=click.Path())
 @click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
               help='Format of files to import (default: vcard)')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def import_contacts(folder_path, graph_file, format, verbose):
+def import_contacts(folder_path, graph_file, format, graph_format, verbose):
     """Import contacts from a folder and save to graph.
     
     Uses intelligent merging to preserve existing data while importing new information.
     Missing fields in imported contacts do not delete existing graph data.
     
     FOLDER_PATH: Path to folder containing contact files
-    GRAPH_FILE: Path to save the contact graph (GraphML format)
+    GRAPH_FILE: Path to save the contact graph (.graphml or .json)
     """
     if verbose:
         click.echo(f"Importing {format} files from {folder_path}...")
@@ -62,7 +64,7 @@ def import_contacts(folder_path, graph_file, format, verbose):
         if verbose:
             click.echo(f"Loading existing graph from {graph_file}...")
         try:
-            graph.load(graph_file)
+            graph.load(graph_file, format=graph_format)
         except Exception as e:
             click.echo(f"Warning: Could not load existing graph: {e}", err=True)
     
@@ -89,7 +91,7 @@ def import_contacts(folder_path, graph_file, format, verbose):
             skipped += 1
     
     # Save graph
-    graph.save(graph_file)
+    graph.save(graph_file, format=graph_format)
     
     if verbose:
         click.echo(f"Added: {added}, Updated: {updated}, Skipped: {skipped}")
@@ -104,15 +106,17 @@ def import_contacts(folder_path, graph_file, format, verbose):
 @click.argument('output_folder', type=click.Path())
 @click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
               help='Format to export (default: vcard)')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
 @click.option('--force', is_flag=True, help='Force overwrite all files (ignore change detection)')
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def export_contacts(graph_file, output_folder, format, force, verbose):
+def export_contacts(graph_file, output_folder, format, graph_format, force, verbose):
     """Export contacts from graph to a folder.
     
     Only writes files when data has changed to minimize file system operations.
     Use --force to override and write all files.
     
-    GRAPH_FILE: Path to the contact graph file
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
     OUTPUT_FOLDER: Path to folder where contacts will be exported
     """
     if verbose:
@@ -121,7 +125,7 @@ def export_contacts(graph_file, output_folder, format, force, verbose):
     # Load graph
     graph = ContactGraph()
     try:
-        graph.load(graph_file)
+        graph.load(graph_file, format=graph_format)
     except FileNotFoundError:
         click.echo(f"Error: Graph file not found: {graph_file}", err=True)
         sys.exit(1)
@@ -167,15 +171,17 @@ def export_contacts(graph_file, output_folder, format, force, verbose):
 
 @cli.command()
 @click.argument('graph_file', type=click.Path(exists=True))
-def list_contacts(graph_file):
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+def list_contacts(graph_file, graph_format):
     """List all contacts in the graph.
     
-    GRAPH_FILE: Path to the contact graph file
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
     """
     # Load graph
     graph = ContactGraph()
     try:
-        graph.load(graph_file)
+        graph.load(graph_file, format=graph_format)
     except FileNotFoundError:
         click.echo(f"Error: Graph file not found: {graph_file}", err=True)
         sys.exit(1)
@@ -209,16 +215,18 @@ def list_contacts(graph_file):
 @cli.command()
 @click.argument('graph_file', type=click.Path(exists=True))
 @click.argument('query')
-def search(graph_file, query):
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+def search(graph_file, query, graph_format):
     """Search for contacts by name or email in the graph.
     
-    GRAPH_FILE: Path to the contact graph file
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
     QUERY: Search query (case-insensitive)
     """
     # Load graph
     graph = ContactGraph()
     try:
-        graph.load(graph_file)
+        graph.load(graph_file, format=graph_format)
     except FileNotFoundError:
         click.echo(f"Error: Graph file not found: {graph_file}", err=True)
         sys.exit(1)
@@ -267,13 +275,15 @@ def search(graph_file, query):
 @click.argument('graph_file', type=click.Path())
 @click.argument('target_folder', type=click.Path())
 @click.argument('target_format', type=click.Choice(['vcard', 'markdown', 'yaml']))
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def convert(source_folder, source_format, graph_file, target_folder, target_format, verbose):
+def convert(source_folder, source_format, graph_file, target_folder, target_format, graph_format, verbose):
     """Convert contacts from one format to another via graph.
     
     SOURCE_FOLDER: Path to folder with source contacts
     SOURCE_FORMAT: Format of source files (vcard or markdown)
-    GRAPH_FILE: Path to save/load the contact graph
+    GRAPH_FILE: Path to save/load the contact graph (.graphml or .json)
     TARGET_FOLDER: Path to folder for converted contacts
     TARGET_FORMAT: Format to convert to (vcard, markdown, or yaml)
     """
@@ -295,7 +305,7 @@ def convert(source_folder, source_format, graph_file, target_folder, target_form
         if verbose:
             click.echo(f"Loading existing graph from {graph_file}...")
         try:
-            graph.load(graph_file)
+            graph.load(graph_file, format=graph_format)
         except Exception as e:
             click.echo(f"Warning: Could not load existing graph: {e}", err=True)
     
@@ -320,7 +330,7 @@ def convert(source_folder, source_format, graph_file, target_folder, target_form
             skipped += 1
     
     # Save graph
-    graph.save(graph_file)
+    graph.save(graph_file, format=graph_format)
     if verbose:
         click.echo(f"Graph saved to {graph_file}")
         click.echo(f"Added: {added}, Updated: {updated}, Skipped: {skipped}")
