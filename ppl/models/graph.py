@@ -4,7 +4,7 @@ Contact graph manager using NetworkX.
 import networkx as nx
 import pickle
 import json
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from pathlib import Path
 from .contact import Contact
 from .relationship import Relationship
@@ -57,6 +57,49 @@ class ContactGraph:
         
         self._contacts[contact.uid] = contact
         self.graph.nodes[contact.uid]['contact'] = contact
+    
+    def merge_contact(self, contact: Contact) -> Tuple[bool, str]:
+        """
+        Intelligently add or merge a contact into the graph.
+        
+        If contact doesn't exist in graph:
+            - Add it as new contact
+            - Return (True, "added")
+        
+        If contact exists in graph:
+            - Compare REV timestamps
+            - If incoming is newer or equal, merge data
+            - Return (True, "updated") if changes made
+            - Return (False, "skipped") if incoming is older
+        
+        Args:
+            contact: Contact to add or merge
+            
+        Returns:
+            Tuple of (was_modified, action) where action is "added", "updated", or "skipped"
+        """
+        if not contact.uid:
+            raise ValueError("Contact must have a UID to be merged")
+        
+        # Check if contact exists in graph
+        existing = self.get_contact(contact.uid)
+        
+        if existing is None:
+            # Contact doesn't exist, add it
+            self.add_contact(contact)
+            return (True, "added")
+        
+        # Contact exists, compare REV timestamps
+        rev_comparison = existing.compare_rev(contact)
+        
+        if rev_comparison > 0:
+            # Existing is newer, skip incoming
+            return (False, "skipped")
+        
+        # Incoming is newer or equal, merge it
+        existing.merge_from(contact, prefer_newer=True)
+        self.update_contact(existing)
+        return (True, "updated")
     
     def get_contact(self, uid: str) -> Optional[Contact]:
         """
@@ -170,7 +213,34 @@ class ContactGraph:
         
         return relationships
     
-    def save(self, file_path: str) -> None:
+    def save(self, file_path: str, format: Optional[str] = None) -> None:
+        """
+        Save the contact graph to disk.
+        
+        Supports GraphML and JSON formats. Format is auto-detected from file extension
+        if not specified.
+        
+        Args:
+            file_path: Path to save the graph file
+            format: Format to use ('graphml' or 'json'). Auto-detected if None.
+        """
+        # Determine format from extension if not specified
+        if format is None:
+            ext = Path(file_path).suffix.lower()
+            if ext == '.json':
+                format = 'json'
+            else:
+                format = 'graphml'
+        
+        # Ensure directory exists
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        if format == 'json':
+            self._save_json(file_path)
+        else:
+            self._save_graphml(file_path)
+    
+    def _save_graphml(self, file_path: str) -> None:
         """
         Save the contact graph to disk using GraphML format.
         
@@ -200,18 +270,75 @@ class ContactGraph:
                     edge_data[key] = value
             export_graph.add_edge(u, v, **edge_data)
         
-        # Ensure directory exists
-        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        
         # Write to GraphML
         nx.write_graphml(export_graph, file_path)
     
-    def load(self, file_path: str) -> None:
+    def _save_json(self, file_path: str) -> None:
+        """
+        Save the contact graph to disk using JSON format.
+        
+        Uses the graphology JSON schema format:
+        {
+          "attributes": {"name": "..."},
+          "options": {"allowSelfLoops": true, "multi": false, "type": "mixed"},
+          "nodes": [{"key": "uid1"}, {"key": "uid2"}],
+          "edges": [{"key": "uid1->uid2", "source": "uid1", "target": "uid2", "attributes": {...}}]
+        }
+        
+        Args:
+            file_path: Path to save the graph file
+        """
+        # Build JSON structure
+        graph_data = {
+            "attributes": {
+                "name": "Contact Graph"
+            },
+            "options": {
+                "allowSelfLoops": True,
+                "multi": False,
+                "type": "directed"
+            },
+            "nodes": [],
+            "edges": []
+        }
+        
+        # Add nodes
+        for uid, contact in self._contacts.items():
+            node = {
+                "key": uid,
+                "attributes": self._serialize_contact(contact)
+            }
+            graph_data["nodes"].append(node)
+        
+        # Add edges
+        for u, v, data in self.graph.edges(data=True):
+            edge = {
+                "key": f"{u}->{v}",
+                "source": u,
+                "target": v,
+                "attributes": {}
+            }
+            
+            # Copy edge attributes
+            for key, value in data.items():
+                edge["attributes"][key] = value
+            
+            graph_data["edges"].append(edge)
+        
+        # Write to JSON file
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(graph_data, f, indent=2, ensure_ascii=False)
+    
+    def load(self, file_path: str, format: Optional[str] = None) -> None:
         """
         Load a contact graph from disk.
         
+        Supports GraphML and JSON formats. Format is auto-detected from file extension
+        if not specified.
+        
         Args:
             file_path: Path to the graph file
+            format: Format to use ('graphml' or 'json'). Auto-detected if None.
             
         Raises:
             FileNotFoundError: If the file doesn't exist
@@ -219,6 +346,26 @@ class ContactGraph:
         if not Path(file_path).exists():
             raise FileNotFoundError(f"Graph file not found: {file_path}")
         
+        # Determine format from extension if not specified
+        if format is None:
+            ext = Path(file_path).suffix.lower()
+            if ext == '.json':
+                format = 'json'
+            else:
+                format = 'graphml'
+        
+        if format == 'json':
+            self._load_json(file_path)
+        else:
+            self._load_graphml(file_path)
+    
+    def _load_graphml(self, file_path: str) -> None:
+        """
+        Load a contact graph from GraphML format.
+        
+        Args:
+            file_path: Path to the graph file
+        """
         # Read GraphML
         import_graph = nx.read_graphml(file_path)
         
@@ -246,6 +393,38 @@ class ContactGraph:
                 else:
                     edge_data[key] = value
             self.graph.add_edge(u, v, **edge_data)
+    
+    def _load_json(self, file_path: str) -> None:
+        """
+        Load a contact graph from JSON format.
+        
+        Expects the graphology JSON schema format.
+        
+        Args:
+            file_path: Path to the graph file
+        """
+        # Read JSON file
+        with open(file_path, 'r', encoding='utf-8') as f:
+            graph_data = json.load(f)
+        
+        # Clear current graph
+        self.graph = nx.DiGraph()
+        self._contacts = {}
+        
+        # Restore contacts from nodes
+        for node in graph_data.get("nodes", []):
+            uid = node["key"]
+            node_attrs = node.get("attributes", {})
+            contact = self._deserialize_contact(uid, node_attrs)
+            self._contacts[uid] = contact
+            self.graph.add_node(uid, contact=contact)
+        
+        # Restore edges
+        for edge in graph_data.get("edges", []):
+            source = edge["source"]
+            target = edge["target"]
+            edge_attrs = edge.get("attributes", {})
+            self.graph.add_edge(source, target, **edge_attrs)
     
     @staticmethod
     def _serialize_contact(contact: Contact) -> Dict[str, str]:

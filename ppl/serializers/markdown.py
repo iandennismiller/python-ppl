@@ -363,23 +363,91 @@ def bulk_import_markdown(folder_path: str) -> List[Contact]:
     return contacts
 
 
-def bulk_export_markdown(contacts: List[Contact], folder_path: str) -> None:
+def should_export_markdown(contact: Contact, file_path: str, folder_path: Optional[str] = None) -> bool:
+    """
+    Determine if markdown file should be written.
+    
+    Returns True if:
+    - File doesn't exist
+    - File exists but contact has newer REV
+    - File exists but content differs (REV is same)
+    
+    Returns False if:
+    - File exists with same or newer REV and identical content
+    
+    Args:
+        contact: Contact to potentially export
+        file_path: Path where file would be written
+        folder_path: Path to folder (for resolving wiki links)
+        
+    Returns:
+        True if file should be written, False otherwise
+    """
+    # If file doesn't exist, always export
+    if not os.path.exists(file_path):
+        return True
+    
+    try:
+        # Load existing contact from file
+        with open(file_path, 'r', encoding='utf-8') as f:
+            existing_md = f.read()
+        
+        existing_contact = from_markdown(existing_md, folder_path or os.path.dirname(file_path))
+        
+        # Compare REV timestamps
+        rev_comparison = contact.compare_rev(existing_contact)
+        
+        # If contact is newer, export
+        if rev_comparison > 0:
+            return True
+        
+        # If existing is newer, don't export
+        if rev_comparison < 0:
+            return False
+        
+        # REV is equal or both None, compare content
+        new_md = to_markdown(contact)
+        
+        # If content is different, export
+        return new_md != existing_md
+    
+    except Exception:
+        # If we can't read the existing file, export to be safe
+        return True
+
+
+def bulk_export_markdown(contacts: List[Contact], folder_path: str, force: bool = False) -> Tuple[int, int]:
     """
     Export multiple contacts to markdown files.
+    Only writes files when data has changed unless force=True.
     
     Args:
         contacts: List of contacts to export
         folder_path: Path to folder where .md files will be written
+        force: If True, write all files regardless of changes
+        
+    Returns:
+        Tuple of (files_written, files_skipped)
     """
     folder = Path(folder_path)
     folder.mkdir(parents=True, exist_ok=True)
+    
+    written = 0
+    skipped = 0
     
     for contact in contacts:
         # Use FN as filename, sanitized
         filename = contact.fn.replace('/', '_').replace('\\', '_') + '.md'
         file_path = folder / filename
         
-        md_content = to_markdown(contact)
-        
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(md_content)
+        if force or should_export_markdown(contact, str(file_path), folder_path):
+            md_content = to_markdown(contact)
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+            
+            written += 1
+        else:
+            skipped += 1
+    
+    return (written, skipped)
