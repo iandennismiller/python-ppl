@@ -28,6 +28,39 @@ For development:
 pip install -e ".[dev]"
 ```
 
+## Development Tasks
+
+PPL includes a Makefile for common development tasks:
+
+```bash
+# Show all available commands
+make help
+
+# Install production dependencies
+make install
+
+# Install development dependencies (includes test tools)
+make install-dev
+
+# Run all tests
+make test
+
+# Run tests with verbose output
+make test-verbose
+
+# Run tests with coverage report
+make coverage
+
+# Run all quality checks (tests + coverage)
+make check
+
+# Clean build artifacts and cache files
+make clean
+
+# Build distribution packages
+make build
+```
+
 ## Quick Start
 
 ### Using the CLI
@@ -194,6 +227,24 @@ PPL supports all vCard 4.0 RELATED TYPE values:
 
 ### Running Tests
 
+Using the Makefile (recommended):
+
+```bash
+# Run all tests
+make test
+
+# Run tests with verbose output
+make test-verbose
+
+# Run with coverage report
+make coverage
+
+# Run all quality checks
+make check
+```
+
+Or using pytest directly:
+
 ```bash
 # Run all tests
 pytest tests/
@@ -203,6 +254,22 @@ pytest tests/ --cov=ppl --cov-report=term-missing
 
 # Run specific test file
 pytest tests/test_contact.py -v
+```
+
+### Other Development Tasks
+
+```bash
+# Install dependencies
+make install-dev
+
+# Clean build artifacts
+make clean
+
+# Build distribution packages
+make build
+
+# Show all available commands
+make help
 ```
 
 ### Test Coverage
