@@ -11,10 +11,12 @@ PPL (Python People Manager) is a command-line tool and Python library for managi
 - **Graph-based relationship modeling** using NetworkX
 - **Multiple serialization formats**: vCard 4.0, YAML, and Markdown
 - **vCard 4.0 compliant** with full support for RELATED properties
-- **Intelligent merge logic** based on REV timestamps
+- **Intelligent merge logic** based on REV timestamps for non-destructive curation
+- **Smart export** that only writes changed files to minimize file system operations
 - **Extensible filter pipeline** for data validation and curation
 - **Wiki-style links** in Markdown format for easy relationship management
 - **Command-line interface** for common operations
+- **Incremental updates** that preserve existing data when importing partial contacts
 
 ## Installation
 
@@ -62,6 +64,35 @@ make build
 ```
 
 ## Quick Start
+
+### Contact Curation Workflow
+
+PPL is designed for incremental contact curation - adding and refining information over time without losing data:
+
+```bash
+# Import initial contacts
+ppl import-contacts contacts/ graph.graphml --format vcard --verbose
+# Output: Added: 50, Updated: 0, Skipped: 0
+
+# Later, import additional info (missing fields won't delete existing data)
+ppl import-contacts updates/ graph.graphml --format vcard --verbose
+# Output: Added: 5, Updated: 23, Skipped: 2
+
+# Export only writes files that changed
+ppl export-contacts graph.graphml output/ --format markdown --verbose
+# Output: Written: 28, Skipped: 22
+
+# Force export all files if needed
+ppl export-contacts graph.graphml output/ --format vcard --force
+```
+
+**Key principles:**
+- Missing fields in imports don't delete existing graph data
+- REV timestamps control which data wins conflicts
+- Exports only write files when data has changed
+- Use `--verbose` to see what's happening
+
+See [Curation Workflow Guide](project/CurationWorkflow.md) for detailed examples and best practices.
 
 ### Using the CLI
 
@@ -331,10 +362,14 @@ make help
 
 Current test coverage: **68%** (core modules >80%)
 
-- 112 passing tests
+- 154 passing tests
   - 87 unit tests for individual modules
   - 17 integration tests simulating user workflows
   - 8 graph persistence tests
+  - 14 contact merge tests
+  - 9 graph merge tests
+  - 13 export change detection tests
+  - 6 curation workflow tests
 - Full coverage of models, serializers, and filters
 - Integration tests cover:
   - Complete workflows from import to export
@@ -343,6 +378,9 @@ Current test coverage: **68%** (core modules >80%)
   - Graph operations with relationships
   - Graph persistence and loading
   - Collaborative contact management scenarios
+  - Incremental contact curation workflows
+  - Non-destructive merging and REV-based conflict resolution
+  - Smart export with change detection
   - Error handling and edge cases
   - Performance with large datasets (100+ contacts)
 
