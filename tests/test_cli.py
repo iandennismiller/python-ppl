@@ -205,3 +205,124 @@ class TestShowCommand:
             assert "Relationships:" in result.output
             assert "friend" in result.output
             assert "Alice" in result.output
+
+
+class TestFilterCommand:
+    """Test the 'ppl filter' command."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.runner = CliRunner()
+        
+    def test_filter_single_contact_dry_run(self):
+        """Test filter command on single contact with dry-run."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            # Create a contact without gender
+            contact = Contact(
+                fn="Alice",
+                email=["alice@example.com"],
+                uid="alice-uid"
+            )
+            
+            graph = ContactGraph()
+            graph.add_contact(contact)
+            graph.save(graph_file)
+            
+            # Run filter command with dry-run
+            result = self.runner.invoke(cli, ['filter', graph_file, 'alice-uid', '--dry-run'])
+            
+            assert result.exit_code == 0
+            assert "Dry run complete" in result.output
+    
+    def test_filter_all_contacts_dry_run(self):
+        """Test filter command on all contacts with dry-run."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            # Create contacts
+            alice = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            bob = Contact(fn="Bob", email=["bob@example.com"], uid="bob-uid")
+            
+            graph = ContactGraph()
+            graph.add_contact(alice)
+            graph.add_contact(bob)
+            graph.save(graph_file)
+            
+            # Run filter command on all contacts with dry-run
+            result = self.runner.invoke(cli, ['filter', graph_file, '--all', '--dry-run'])
+            
+            assert result.exit_code == 0
+            assert "Dry run complete" in result.output
+    
+    def test_filter_missing_uid_and_all_flag(self):
+        """Test filter command with neither UID nor --all flag."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            graph = ContactGraph()
+            graph.save(graph_file)
+            
+            # Run filter command without UID or --all flag
+            result = self.runner.invoke(cli, ['filter', graph_file])
+            
+            assert result.exit_code == 1
+            assert "Must specify either UID or --all flag" in result.output
+    
+    def test_filter_both_uid_and_all_flag(self):
+        """Test filter command with both UID and --all flag."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            contact = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            graph = ContactGraph()
+            graph.add_contact(contact)
+            graph.save(graph_file)
+            
+            # Run filter command with both UID and --all flag
+            result = self.runner.invoke(cli, ['filter', graph_file, 'alice-uid', '--all'])
+            
+            assert result.exit_code == 1
+            assert "Cannot specify both UID and --all flag" in result.output
+    
+    def test_filter_nonexistent_uid(self):
+        """Test filter command with non-existent UID."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            graph = ContactGraph()
+            graph.save(graph_file)
+            
+            # Run filter command with non-existent UID
+            result = self.runner.invoke(cli, ['filter', graph_file, 'nonexistent-uid'])
+            
+            assert result.exit_code == 1
+            assert "not found" in result.output
+    
+    def test_filter_saves_changes(self):
+        """Test filter command saves changes when not in dry-run mode."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            # Create a contact
+            contact = Contact(
+                fn="Alice",
+                email=["alice@example.com"],
+                uid="alice-uid"
+            )
+            
+            graph = ContactGraph()
+            graph.add_contact(contact)
+            graph.save(graph_file)
+            
+            # Run filter command (not dry-run)
+            result = self.runner.invoke(cli, ['filter', graph_file, 'alice-uid'])
+            
+            assert result.exit_code == 0
+            
+            # Verify graph can still be loaded
+            graph_after = ContactGraph()
+            graph_after.load(graph_file)
+            assert graph_after.get_contact("alice-uid") is not None
+

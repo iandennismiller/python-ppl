@@ -5,7 +5,7 @@ import click
 import sys
 from pathlib import Path
 
-from .models import ContactGraph, import_pipeline, Contact
+from .models import ContactGraph, import_pipeline, Contact, curation_pipeline
 from .serializers import vcard, yaml_serializer, markdown
 from .filters import UIDFilter, GenderFilter
 
@@ -13,6 +13,9 @@ from .filters import UIDFilter, GenderFilter
 # Register filters in the import pipeline
 import_pipeline.register(UIDFilter())
 import_pipeline.register(GenderFilter())
+
+# Register filters in the curation pipeline
+curation_pipeline.register(GenderFilter())
 
 
 @click.group()
@@ -375,6 +378,118 @@ def show(graph_file, uid, format, graph_format):
     elif format == 'markdown':
         # Output as Markdown
         click.echo(markdown.to_markdown(contact))
+
+
+@cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.argument('uid', required=False)
+@click.option('--all', 'all_contacts', is_flag=True, help='Run filters on all contacts')
+@click.option('--dry-run', is_flag=True, help='Preview changes without saving')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+@click.option('--verbose', is_flag=True, help='Enable verbose output')
+def filter(graph_file, uid, all_contacts, dry_run, graph_format, verbose):
+    """Run filter pipeline on contacts.
+    
+    Execute the curation pipeline on a specific contact or all contacts.
+    Use --dry-run to preview changes without saving to the graph.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    UID: Unique identifier of the contact to filter (optional if --all is used)
+    """
+    # Validate arguments
+    if not uid and not all_contacts:
+        click.echo("Error: Must specify either UID or --all flag", err=True)
+        sys.exit(1)
+    
+    if uid and all_contacts:
+        click.echo("Error: Cannot specify both UID and --all flag", err=True)
+        sys.exit(1)
+    
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    # Get contacts to filter
+    if all_contacts:
+        contacts = graph.get_all_contacts()
+        if verbose:
+            click.echo(f"Running filters on {len(contacts)} contacts...")
+    else:
+        contact = graph.get_contact(uid)
+        if not contact:
+            click.echo(f"Error: Contact with UID '{uid}' not found", err=True)
+            sys.exit(1)
+        contacts = [contact]
+        if verbose:
+            click.echo(f"Running filters on {contact.fn}...")
+    
+    # Run filters
+    from .models import FilterContext
+    import copy
+    
+    context = FilterContext(pipeline_name="curation")
+    modified_count = 0
+    changes = []
+    
+    for contact in contacts:
+        # Create a copy to compare before/after
+        contact_before = copy.deepcopy(contact)
+        
+        # Run curation pipeline
+        contact_after = curation_pipeline.run(contact, context)
+        
+        # Check for changes
+        contact_changed = False
+        contact_changes = []
+        
+        # Compare fields for changes
+        if contact_before.gender != contact_after.gender:
+            contact_changed = True
+            contact_changes.append(f"  GENDER: {contact_before.gender} → {contact_after.gender}")
+        
+        if contact_before.email != contact_after.email:
+            contact_changed = True
+            contact_changes.append(f"  EMAIL: {contact_before.email} → {contact_after.email}")
+        
+        if contact_before.tel != contact_after.tel:
+            contact_changed = True
+            contact_changes.append(f"  TEL: {contact_before.tel} → {contact_after.tel}")
+        
+        if contact_changed:
+            modified_count += 1
+            changes.append({
+                'contact': contact_after,
+                'changes': contact_changes
+            })
+            
+            if verbose or not all_contacts:
+                click.echo(f"\n{contact_after.fn} ({contact_after.uid}):")
+                for change in contact_changes:
+                    click.echo(change)
+            
+            # Update graph unless dry-run
+            if not dry_run:
+                graph.update_contact(contact_after)
+    
+    # Save graph unless dry-run
+    if not dry_run and modified_count > 0:
+        graph.save(graph_file, format=graph_format)
+        if verbose:
+            click.echo(f"\nGraph saved to {graph_file}")
+    
+    # Summary
+    if dry_run:
+        click.echo(f"\nDry run complete. {modified_count} contact(s) would be modified.")
+    else:
+        click.echo(f"\nFilters complete. {modified_count} contact(s) modified.")
 
 
 @cli.command()
