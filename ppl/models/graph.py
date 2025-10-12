@@ -2,7 +2,10 @@
 Contact graph manager using NetworkX.
 """
 import networkx as nx
+import pickle
+import json
 from typing import List, Optional, Dict
+from pathlib import Path
 from .contact import Contact
 from .relationship import Relationship
 
@@ -166,3 +169,298 @@ class ContactGraph:
             relationships.extend(self.get_relationships(source_uid))
         
         return relationships
+    
+    def save(self, file_path: str) -> None:
+        """
+        Save the contact graph to disk using GraphML format.
+        
+        The graph structure is saved as GraphML, and Contact objects are serialized
+        as JSON in the node attributes.
+        
+        Args:
+            file_path: Path to save the graph file
+        """
+        # Create a copy of the graph for serialization
+        export_graph = nx.DiGraph()
+        
+        # Add nodes with serialized contact data
+        for uid, contact in self._contacts.items():
+            # Serialize contact to dict
+            contact_data = self._serialize_contact(contact)
+            export_graph.add_node(uid, **contact_data)
+        
+        # Copy all edges with their attributes (serialize lists as JSON)
+        for u, v, data in self.graph.edges(data=True):
+            edge_data = {}
+            for key, value in data.items():
+                if isinstance(value, (list, dict)):
+                    # Serialize complex types as JSON
+                    edge_data[key] = json.dumps(value)
+                else:
+                    edge_data[key] = value
+            export_graph.add_edge(u, v, **edge_data)
+        
+        # Ensure directory exists
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write to GraphML
+        nx.write_graphml(export_graph, file_path)
+    
+    def load(self, file_path: str) -> None:
+        """
+        Load a contact graph from disk.
+        
+        Args:
+            file_path: Path to the graph file
+            
+        Raises:
+            FileNotFoundError: If the file doesn't exist
+        """
+        if not Path(file_path).exists():
+            raise FileNotFoundError(f"Graph file not found: {file_path}")
+        
+        # Read GraphML
+        import_graph = nx.read_graphml(file_path)
+        
+        # Clear current graph
+        self.graph = nx.DiGraph()
+        self._contacts = {}
+        
+        # Restore contacts from nodes
+        for uid in import_graph.nodes():
+            node_data = import_graph.nodes[uid]
+            contact = self._deserialize_contact(uid, node_data)
+            self._contacts[uid] = contact
+            self.graph.add_node(uid, contact=contact)
+        
+        # Restore edges with deserialized attributes
+        for u, v, data in import_graph.edges(data=True):
+            edge_data = {}
+            for key, value in data.items():
+                # Try to deserialize JSON strings back to lists/dicts
+                if isinstance(value, str):
+                    try:
+                        edge_data[key] = json.loads(value)
+                    except (json.JSONDecodeError, TypeError):
+                        edge_data[key] = value
+                else:
+                    edge_data[key] = value
+            self.graph.add_edge(u, v, **edge_data)
+    
+    @staticmethod
+    def _serialize_contact(contact: Contact) -> Dict[str, str]:
+        """
+        Serialize a Contact to a dictionary for GraphML storage.
+        
+        Args:
+            contact: Contact to serialize
+            
+        Returns:
+            Dictionary with string values for GraphML compatibility
+        """
+        data = {
+            'fn': contact.fn,
+            'version': contact.version,
+        }
+        
+        # Serialize complex fields as JSON strings for GraphML
+        if contact.uid:
+            data['uid'] = contact.uid
+        
+        if contact.n:
+            data['n'] = contact.n
+        
+        if contact.rev:
+            data['rev'] = contact.rev.isoformat()
+        
+        if contact.email:
+            data['email'] = json.dumps(contact.email)
+        
+        if contact.tel:
+            data['tel'] = json.dumps(contact.tel)
+        
+        if contact.adr:
+            data['adr'] = json.dumps(contact.adr)
+        
+        if contact.org:
+            data['org'] = json.dumps(contact.org)
+        
+        if contact.title:
+            data['title'] = contact.title
+        
+        if contact.role:
+            data['role'] = contact.role
+        
+        if contact.note:
+            data['note'] = contact.note
+        
+        if contact.categories:
+            data['categories'] = json.dumps(contact.categories)
+        
+        if contact.url:
+            data['url'] = json.dumps(contact.url)
+        
+        if contact.nickname:
+            data['nickname'] = json.dumps(contact.nickname)
+        
+        if contact.bday:
+            data['bday'] = contact.bday
+        
+        if contact.anniversary:
+            data['anniversary'] = contact.anniversary
+        
+        if contact.gender:
+            data['gender'] = contact.gender
+        
+        if contact.photo:
+            data['photo'] = contact.photo
+        
+        if contact.tz:
+            data['tz'] = contact.tz
+        
+        if contact.geo:
+            data['geo'] = json.dumps(contact.geo)
+        
+        if contact.related:
+            # Serialize Related objects
+            related_data = []
+            for rel in contact.related:
+                rel_dict = {
+                    'uri': rel.uri,
+                    'type': rel.type,
+                    'text_value': rel.text_value,
+                    'pref': rel.pref
+                }
+                related_data.append(rel_dict)
+            data['related'] = json.dumps(related_data)
+        
+        return data
+    
+    @staticmethod
+    def _deserialize_contact(uid: str, data: Dict[str, str]) -> Contact:
+        """
+        Deserialize a Contact from GraphML node data.
+        
+        Args:
+            uid: Contact UID
+            data: Node data from GraphML
+            
+        Returns:
+            Contact object
+        """
+        from datetime import datetime
+        from .contact import Related
+        
+        # Create contact with required field
+        fn = data.get('fn', '')
+        contact = Contact(fn=fn)
+        
+        # Restore UID
+        contact.uid = data.get('uid', uid)
+        
+        # Restore version
+        if 'version' in data:
+            contact.version = data['version']
+        
+        # Restore REV
+        if 'rev' in data:
+            try:
+                contact.rev = datetime.fromisoformat(data['rev'])
+            except (ValueError, AttributeError):
+                pass
+        
+        # Restore simple fields
+        if 'n' in data:
+            contact.n = data['n']
+        
+        if 'title' in data:
+            contact.title = data['title']
+        
+        if 'role' in data:
+            contact.role = data['role']
+        
+        if 'note' in data:
+            contact.note = data['note']
+        
+        if 'bday' in data:
+            contact.bday = data['bday']
+        
+        if 'anniversary' in data:
+            contact.anniversary = data['anniversary']
+        
+        if 'gender' in data:
+            contact.gender = data['gender']
+        
+        if 'photo' in data:
+            contact.photo = data['photo']
+        
+        if 'tz' in data:
+            contact.tz = data['tz']
+        
+        # Restore JSON-serialized list fields
+        if 'email' in data:
+            try:
+                contact.email = json.loads(data['email'])
+            except (json.JSONDecodeError, TypeError):
+                contact.email = [data['email']]
+        
+        if 'tel' in data:
+            try:
+                contact.tel = json.loads(data['tel'])
+            except (json.JSONDecodeError, TypeError):
+                contact.tel = [data['tel']]
+        
+        if 'adr' in data:
+            try:
+                contact.adr = json.loads(data['adr'])
+            except (json.JSONDecodeError, TypeError):
+                contact.adr = [data['adr']]
+        
+        if 'org' in data:
+            try:
+                contact.org = json.loads(data['org'])
+            except (json.JSONDecodeError, TypeError):
+                contact.org = [data['org']]
+        
+        if 'categories' in data:
+            try:
+                contact.categories = json.loads(data['categories'])
+            except (json.JSONDecodeError, TypeError):
+                contact.categories = [data['categories']]
+        
+        if 'url' in data:
+            try:
+                contact.url = json.loads(data['url'])
+            except (json.JSONDecodeError, TypeError):
+                contact.url = [data['url']]
+        
+        if 'nickname' in data:
+            try:
+                contact.nickname = json.loads(data['nickname'])
+            except (json.JSONDecodeError, TypeError):
+                contact.nickname = [data['nickname']]
+        
+        if 'geo' in data:
+            try:
+                geo_data = json.loads(data['geo'])
+                if isinstance(geo_data, list) and len(geo_data) == 2:
+                    contact.geo = tuple(geo_data)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Restore Related objects
+        if 'related' in data:
+            try:
+                related_data = json.loads(data['related'])
+                for rel_dict in related_data:
+                    related = Related(
+                        uri=rel_dict.get('uri', ''),
+                        type=rel_dict.get('type', []),
+                        text_value=rel_dict.get('text_value'),
+                        pref=rel_dict.get('pref')
+                    )
+                    contact.related.append(related)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        return contact

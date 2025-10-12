@@ -27,13 +27,15 @@ def cli():
 
 @cli.command()
 @click.argument('folder_path', type=click.Path(exists=True))
+@click.argument('graph_file', type=click.Path())
 @click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
               help='Format of files to import (default: vcard)')
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def import_contacts(folder_path, format, verbose):
-    """Import contacts from a folder.
+def import_contacts(folder_path, graph_file, format, verbose):
+    """Import contacts from a folder and save to graph.
     
     FOLDER_PATH: Path to folder containing contact files
+    GRAPH_FILE: Path to save the contact graph (GraphML format)
     """
     if verbose:
         click.echo(f"Importing {format} files from {folder_path}...")
@@ -51,72 +53,117 @@ def import_contacts(folder_path, format, verbose):
         click.echo(f"Unknown format: {format}", err=True)
         sys.exit(1)
     
+    # Load existing graph if it exists
+    graph = ContactGraph()
+    if Path(graph_file).exists():
+        if verbose:
+            click.echo(f"Loading existing graph from {graph_file}...")
+        try:
+            graph.load(graph_file)
+        except Exception as e:
+            click.echo(f"Warning: Could not load existing graph: {e}", err=True)
+    
+    # Add contacts to graph
+    added = 0
+    updated = 0
+    for contact in contacts:
+        if not contact.uid:
+            # Apply filters if needed
+            from .models import FilterContext
+            context = FilterContext(pipeline_name="import")
+            contact = import_pipeline.run(contact, context)
+        
+        if graph.get_contact(contact.uid):
+            graph.update_contact(contact)
+            updated += 1
+        else:
+            graph.add_contact(contact)
+            added += 1
+    
+    # Save graph
+    graph.save(graph_file)
+    
     if verbose:
-        click.echo(f"Imported {len(contacts)} contacts:")
-        for contact in contacts:
-            click.echo(f"  - {contact.fn} ({contact.uid})")
+        click.echo(f"Added {added} contacts, updated {updated} contacts")
+        click.echo(f"Graph saved to {graph_file}")
+        click.echo(f"Total contacts in graph: {len(graph.get_all_contacts())}")
     else:
-        click.echo(f"Imported {len(contacts)} contacts")
+        click.echo(f"Imported {len(contacts)} contacts to {graph_file}")
 
 
 @cli.command()
-@click.argument('contacts_source', type=click.Path(exists=True))
+@click.argument('graph_file', type=click.Path(exists=True))
 @click.argument('output_folder', type=click.Path())
 @click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
               help='Format to export (default: vcard)')
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def export_contacts(contacts_source, output_folder, format, verbose):
-    """Export contacts to a folder.
+def export_contacts(graph_file, output_folder, format, verbose):
+    """Export contacts from graph to a folder.
     
-    CONTACTS_SOURCE: Path to folder with existing contacts
+    GRAPH_FILE: Path to the contact graph file
     OUTPUT_FOLDER: Path to folder where contacts will be exported
     """
     if verbose:
-        click.echo(f"Exporting contacts to {output_folder} in {format} format...")
+        click.echo(f"Loading graph from {graph_file}...")
     
-    # First import the contacts
-    source_contacts = vcard.bulk_import(contacts_source)
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    contacts = graph.get_all_contacts()
+    
+    if verbose:
+        click.echo(f"Exporting {len(contacts)} contacts to {output_folder} in {format} format...")
     
     # Export contacts based on format
     if format == 'vcard':
-        vcard.bulk_export(source_contacts, output_folder)
+        vcard.bulk_export(contacts, output_folder)
     elif format == 'yaml':
         # Create output folder
         Path(output_folder).mkdir(parents=True, exist_ok=True)
-        for contact in source_contacts:
+        for contact in contacts:
             filename = contact.fn.replace('/', '_').replace('\\', '_') + '.yaml'
             file_path = Path(output_folder) / filename
             with open(file_path, 'w') as f:
                 f.write(yaml_serializer.to_yaml(contact))
     elif format == 'markdown':
-        markdown.bulk_export_markdown(source_contacts, output_folder)
+        markdown.bulk_export_markdown(contacts, output_folder)
     else:
         click.echo(f"Unknown format: {format}", err=True)
         sys.exit(1)
     
     if verbose:
-        click.echo(f"Exported {len(source_contacts)} contacts")
+        click.echo(f"Exported {len(contacts)} contacts")
     else:
-        click.echo(f"Exported {len(source_contacts)} contacts to {output_folder}")
+        click.echo(f"Exported {len(contacts)} contacts to {output_folder}")
 
 
 @cli.command()
-@click.argument('folder_path', type=click.Path(exists=True))
-@click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
-              help='Format of files to list (default: vcard)')
-def list_contacts(folder_path, format):
-    """List all contacts in a folder.
+@click.argument('graph_file', type=click.Path(exists=True))
+def list_contacts(graph_file):
+    """List all contacts in the graph.
     
-    FOLDER_PATH: Path to folder containing contact files
+    GRAPH_FILE: Path to the contact graph file
     """
-    # Import contacts based on format
-    if format == 'vcard':
-        contacts = vcard.bulk_import(folder_path)
-    elif format == 'markdown':
-        contacts = markdown.bulk_import_markdown(folder_path)
-    else:
-        click.echo(f"Format {format} not supported for listing yet", err=True)
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
         sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    contacts = graph.get_all_contacts()
     
     if not contacts:
         click.echo("No contacts found")
@@ -140,25 +187,26 @@ def list_contacts(folder_path, format):
 
 
 @cli.command()
-@click.argument('folder_path', type=click.Path(exists=True))
+@click.argument('graph_file', type=click.Path(exists=True))
 @click.argument('query')
-@click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
-              help='Format of files to search (default: vcard)')
-def search(folder_path, query, format):
-    """Search for contacts by name or email.
+def search(graph_file, query):
+    """Search for contacts by name or email in the graph.
     
-    FOLDER_PATH: Path to folder containing contact files
+    GRAPH_FILE: Path to the contact graph file
     QUERY: Search query (case-insensitive)
     """
-    # Import contacts based on format
-    if format == 'vcard':
-        contacts = vcard.bulk_import(folder_path)
-    elif format == 'markdown':
-        contacts = markdown.bulk_import_markdown(folder_path)
-    else:
-        click.echo(f"Format {format} not supported for search yet", err=True)
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
         sys.exit(1)
     
+    contacts = graph.get_all_contacts()
     query_lower = query.lower()
     matches = []
     
@@ -196,14 +244,16 @@ def search(folder_path, query, format):
 @cli.command()
 @click.argument('source_folder', type=click.Path(exists=True))
 @click.argument('source_format', type=click.Choice(['vcard', 'markdown']))
+@click.argument('graph_file', type=click.Path())
 @click.argument('target_folder', type=click.Path())
 @click.argument('target_format', type=click.Choice(['vcard', 'markdown', 'yaml']))
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def convert(source_folder, source_format, target_folder, target_format, verbose):
-    """Convert contacts from one format to another.
+def convert(source_folder, source_format, graph_file, target_folder, target_format, verbose):
+    """Convert contacts from one format to another via graph.
     
     SOURCE_FOLDER: Path to folder with source contacts
     SOURCE_FORMAT: Format of source files (vcard or markdown)
+    GRAPH_FILE: Path to save/load the contact graph
     TARGET_FOLDER: Path to folder for converted contacts
     TARGET_FORMAT: Format to convert to (vcard, markdown, or yaml)
     """
@@ -219,14 +269,44 @@ def convert(source_folder, source_format, target_folder, target_format, verbose)
         click.echo(f"Unknown source format: {source_format}", err=True)
         sys.exit(1)
     
+    # Load or create graph
+    graph = ContactGraph()
+    if Path(graph_file).exists():
+        if verbose:
+            click.echo(f"Loading existing graph from {graph_file}...")
+        try:
+            graph.load(graph_file)
+        except Exception as e:
+            click.echo(f"Warning: Could not load existing graph: {e}", err=True)
+    
+    # Add contacts to graph
+    for contact in contacts:
+        if not contact.uid:
+            from .models import FilterContext
+            context = FilterContext(pipeline_name="import")
+            contact = import_pipeline.run(contact, context)
+        
+        if graph.get_contact(contact.uid):
+            graph.update_contact(contact)
+        else:
+            graph.add_contact(contact)
+    
+    # Save graph
+    graph.save(graph_file)
+    if verbose:
+        click.echo(f"Graph saved to {graph_file}")
+    
+    # Get all contacts for export
+    all_contacts = graph.get_all_contacts()
+    
     # Export to target format
     if target_format == 'vcard':
-        vcard.bulk_export(contacts, target_folder)
+        vcard.bulk_export(all_contacts, target_folder)
     elif target_format == 'markdown':
-        markdown.bulk_export_markdown(contacts, target_folder)
+        markdown.bulk_export_markdown(all_contacts, target_folder)
     elif target_format == 'yaml':
         Path(target_folder).mkdir(parents=True, exist_ok=True)
-        for contact in contacts:
+        for contact in all_contacts:
             filename = contact.fn.replace('/', '_').replace('\\', '_') + '.yaml'
             file_path = Path(target_folder) / filename
             with open(file_path, 'w') as f:
@@ -235,7 +315,7 @@ def convert(source_folder, source_format, target_folder, target_format, verbose)
         click.echo(f"Unknown target format: {target_format}", err=True)
         sys.exit(1)
     
-    click.echo(f"Converted {len(contacts)} contacts from {source_format} to {target_format}")
+    click.echo(f"Converted {len(all_contacts)} contacts from {source_format} to {target_format}")
 
 
 if __name__ == '__main__':

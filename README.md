@@ -65,22 +65,26 @@ make build
 
 ### Using the CLI
 
+All CLI commands now use a graph file to persist contact data:
+
 ```bash
-# List contacts in a folder
-python -m ppl.cli list-contacts examples/contacts
+# Import contacts from a folder into the graph
+python -m ppl.cli import-contacts examples/contacts contacts.graphml --verbose
 
-# Search for contacts
-python -m ppl.cli search examples/contacts "alice"
+# List all contacts in the graph
+python -m ppl.cli list-contacts contacts.graphml
 
-# Convert between formats
-python -m ppl.cli convert examples/contacts vcard output markdown
+# Search for contacts in the graph
+python -m ppl.cli search contacts.graphml "alice"
 
-# Import contacts with filters (UID assignment, gender inference)
-python -m ppl.cli import-contacts examples/contacts --verbose
+# Export contacts from the graph to a folder
+python -m ppl.cli export-contacts contacts.graphml output --format markdown
 
-# Export to a different format
-python -m ppl.cli export-contacts examples/contacts output --format markdown
+# Convert between formats via graph
+python -m ppl.cli convert examples/contacts vcard contacts.graphml output markdown
 ```
+
+**Graph File**: The graph file (`.graphml` format) is the persistent storage for your contact network. It stores both contacts and their relationships using NetworkX's GraphML format.
 
 ### Using the Python API
 
@@ -114,6 +118,37 @@ md_str = markdown.to_markdown(contact)
 # Work with graphs
 graph = ContactGraph()
 graph.add_contact(contact)
+
+# Save graph to disk
+graph.save("contacts.graphml")
+
+# Load graph from disk later
+graph2 = ContactGraph()
+graph2.load("contacts.graphml")
+```
+
+### Graph Persistence
+
+PPL uses NetworkX's GraphML format to persist contact graphs:
+
+```python
+from ppl.models import ContactGraph
+
+# Create and populate graph
+graph = ContactGraph()
+# ... add contacts and relationships ...
+
+# Save to disk
+graph.save("my_contacts.graphml")
+
+# Load from disk later
+graph = ContactGraph()
+graph.load("my_contacts.graphml")
+
+# Graph automatically preserves:
+# - All contact data (names, emails, phones, etc.)
+# - Relationships between contacts
+# - Metadata and custom attributes
 ```
 
 ## Architecture
@@ -296,15 +331,17 @@ make help
 
 Current test coverage: **68%** (core modules >80%)
 
-- 104 passing tests
+- 112 passing tests
   - 87 unit tests for individual modules
   - 17 integration tests simulating user workflows
+  - 8 graph persistence tests
 - Full coverage of models, serializers, and filters
 - Integration tests cover:
   - Complete workflows from import to export
   - Cross-format conversions (vCard ↔ YAML ↔ Markdown)
   - Filter pipeline integration
   - Graph operations with relationships
+  - Graph persistence and loading
   - Collaborative contact management scenarios
   - Error handling and edge cases
   - Performance with large datasets (100+ contacts)
