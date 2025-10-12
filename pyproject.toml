@@ -7,11 +7,26 @@ requires-python = ">=3.8"
 authors = [
     { name = "Ian Dennis Miller" }
 ]
-dependencies = []
+dependencies = [
+    "networkx>=3.0",
+    "vobject>=0.9.6",
+    "pyyaml>=6.0",
+    "marko>=2.0",
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project.scripts]
+ppl = "ppl.cli:cli"
 
 [tool.setuptools]
 packages = ["ppl"]

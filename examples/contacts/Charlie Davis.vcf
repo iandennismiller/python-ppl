@@ -1,0 +1,13 @@
+BEGIN:VCARD
+VERSION:4.0
+UID:urn:uuid:550e8400-e29b-41d4-a716-446655440003
+EMAIL:c.davis@university.edu
+FN:Charlie Davis
+NOTE:Alice's PhD advisor
+ORG:S;t;a;t;e; ;U;n;i;v;e;r;s;i;t;y
+ORG:C;o;m;p;u;t;e;r; ;S;c;i;e;n;c;e
+RELATED;TYPE=child:urn:uuid:550e8400-e29b-41d4-a716-446655440001
+REV:2025-10-12T00:21:19.164448
+TEL:+1-555-0300
+TITLE:Professor
+END:VCARD
