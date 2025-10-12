@@ -108,6 +108,18 @@ python -m ppl.cli list-contacts contacts.graphml
 # Search for contacts in the graph
 python -m ppl.cli search contacts.graphml "alice"
 
+# Show detailed information about a specific contact
+python -m ppl.cli show contacts.graphml <uid>
+python -m ppl.cli show contacts.graphml <uid> --format json
+
+# Run filters on contacts
+python -m ppl.cli filter contacts.graphml <uid>  # Filter single contact
+python -m ppl.cli filter contacts.graphml --all --dry-run  # Preview changes
+
+# Check consistency between graph and folders
+python -m ppl.cli check-consistency contacts.graphml --vcard-folder contacts/
+python -m ppl.cli check-consistency contacts.graphml --markdown-folder md/ --format json
+
 # Export contacts from the graph to a folder
 python -m ppl.cli export-contacts contacts.graphml output --format markdown
 
@@ -116,6 +128,80 @@ python -m ppl.cli convert examples/contacts vcard contacts.graphml output markdo
 ```
 
 **Graph File**: The graph file (`.graphml` format) is the persistent storage for your contact network. It stores both contacts and their relationships using NetworkX's GraphML format.
+
+### New Commands (Phase 6A)
+
+PPL now includes advanced commands for contact management:
+
+#### `ppl show` - Display Contact Details
+
+Display detailed information about a single contact:
+
+```bash
+# Show contact in human-readable text format
+ppl show contacts.graphml urn:uuid:alice-uid
+
+# Show as JSON for programmatic access
+ppl show contacts.graphml urn:uuid:alice-uid --format json
+
+# Export to different formats
+ppl show contacts.graphml urn:uuid:alice-uid --format vcard
+ppl show contacts.graphml urn:uuid:alice-uid --format yaml
+ppl show contacts.graphml urn:uuid:alice-uid --format markdown
+```
+
+#### `ppl filter` - On-Demand Curation
+
+Execute filter pipeline on specific contacts:
+
+```bash
+# Run filters on single contact
+ppl filter contacts.graphml urn:uuid:alice-uid
+
+# Run filters on all contacts
+ppl filter contacts.graphml --all
+
+# Preview changes without saving (dry-run mode)
+ppl filter contacts.graphml --all --dry-run
+
+# Verbose output to see filter details
+ppl filter contacts.graphml urn:uuid:alice-uid --verbose
+```
+
+**Available Filters:**
+- `UIDFilter`: Assigns UUIDs to contacts without UIDs
+- `GenderFilter`: Infers gender from relationship terms (mother/father/etc.)
+
+#### `ppl check-consistency` - Consistency Checking
+
+Detect inconsistencies across multiple data representations:
+
+```bash
+# Check graph against VCF folder
+ppl check-consistency contacts.graphml --vcard-folder contacts/
+
+# Check multiple formats
+ppl check-consistency contacts.graphml \
+  --vcard-folder contacts/ \
+  --markdown-folder md/ \
+  --verbose
+
+# Output as JSON or YAML
+ppl check-consistency contacts.graphml \
+  --vcard-folder contacts/ \
+  --format json
+
+# Get recommendations for fixing issues
+ppl check-consistency contacts.graphml \
+  --markdown-folder md/ \
+  --verbose
+```
+
+**What it checks:**
+- Missing contacts (in graph but not in files)
+- Orphaned files (in folder but not in graph)
+- Outdated REV timestamps between representations
+- YAML front matter vs content consistency
 
 ### Using the Python API
 
@@ -201,7 +287,10 @@ PPL uses a layered architecture:
    - `UIDFilter`: Assigns UUIDs to contacts without UIDs
    - `GenderFilter`: Infers gender from relationship terms (mother/father/etc.)
 
-4. **CLI** (`ppl/cli.py`)
+4. **Services** (`ppl/services/`)
+   - `ConsistencyService`: Detects inconsistencies across data representations
+
+5. **CLI** (`ppl/cli.py`)
    - Command-line interface built with Click
 
 ## File Formats
