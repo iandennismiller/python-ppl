@@ -4,7 +4,7 @@ Contact graph manager using NetworkX.
 import networkx as nx
 import pickle
 import json
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from pathlib import Path
 from .contact import Contact
 from .relationship import Relationship
@@ -57,6 +57,49 @@ class ContactGraph:
         
         self._contacts[contact.uid] = contact
         self.graph.nodes[contact.uid]['contact'] = contact
+    
+    def merge_contact(self, contact: Contact) -> Tuple[bool, str]:
+        """
+        Intelligently add or merge a contact into the graph.
+        
+        If contact doesn't exist in graph:
+            - Add it as new contact
+            - Return (True, "added")
+        
+        If contact exists in graph:
+            - Compare REV timestamps
+            - If incoming is newer or equal, merge data
+            - Return (True, "updated") if changes made
+            - Return (False, "skipped") if incoming is older
+        
+        Args:
+            contact: Contact to add or merge
+            
+        Returns:
+            Tuple of (was_modified, action) where action is "added", "updated", or "skipped"
+        """
+        if not contact.uid:
+            raise ValueError("Contact must have a UID to be merged")
+        
+        # Check if contact exists in graph
+        existing = self.get_contact(contact.uid)
+        
+        if existing is None:
+            # Contact doesn't exist, add it
+            self.add_contact(contact)
+            return (True, "added")
+        
+        # Contact exists, compare REV timestamps
+        rev_comparison = existing.compare_rev(contact)
+        
+        if rev_comparison > 0:
+            # Existing is newer, skip incoming
+            return (False, "skipped")
+        
+        # Incoming is newer or equal, merge it
+        existing.merge_from(contact, prefer_newer=True)
+        self.update_contact(existing)
+        return (True, "updated")
     
     def get_contact(self, uid: str) -> Optional[Contact]:
         """

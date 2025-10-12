@@ -94,6 +94,107 @@ class Contact:
         if self.rev > other.rev:
             return 1
         return 0
+    
+    def merge_from(self, other: 'Contact', prefer_newer: bool = True) -> 'Contact':
+        """
+        Merge another contact into this one without data loss.
+        
+        Rules:
+        1. If this contact has a value and other doesn't, keep this value
+        2. If other has a value and this doesn't, import other's value
+        3. If both have values:
+           a. If prefer_newer=True, use REV to decide (newer wins)
+           b. If prefer_newer=False, keep this contact's value
+        4. For list fields (email, tel, etc.), merge unique values
+        
+        Args:
+            other: Contact to merge from
+            prefer_newer: Use REV timestamps to resolve conflicts
+            
+        Returns:
+            This contact with merged data
+        """
+        # Determine which contact is newer if prefer_newer is True
+        other_is_newer = False
+        if prefer_newer and self.compare_rev(other) < 0:
+            other_is_newer = True
+        
+        # Define simple optional fields to merge
+        simple_fields = [
+            'n', 'photo', 'bday', 'anniversary', 'gender',
+            'tz', 'title', 'role', 'logo', 'note', 'prodid',
+            'sound', 'fburl', 'caladruri', 'caluri'
+        ]
+        
+        # Merge simple fields
+        for field_name in simple_fields:
+            self_value = getattr(self, field_name)
+            other_value = getattr(other, field_name)
+            
+            # If other has a value and self doesn't, import it
+            if other_value is not None and self_value is None:
+                setattr(self, field_name, other_value)
+            # If both have values and other is newer (or prefer_newer is False and other has value)
+            elif other_value is not None and self_value is not None:
+                if other_is_newer:
+                    setattr(self, field_name, other_value)
+        
+        # Merge geo (tuple field)
+        if other.geo is not None and self.geo is None:
+            self.geo = other.geo
+        elif other.geo is not None and self.geo is not None and other_is_newer:
+            self.geo = other.geo
+        
+        # Define list fields to merge
+        list_fields = [
+            'nickname', 'email', 'tel', 'impp', 'lang', 'adr',
+            'org', 'member', 'categories', 'url', 'key'
+        ]
+        
+        # Merge list fields by combining unique values
+        for field_name in list_fields:
+            self_list = getattr(self, field_name)
+            other_list = getattr(other, field_name)
+            
+            # Merge lists, preserving unique values
+            if other_list:
+                for item in other_list:
+                    if item not in self_list:
+                        self_list.append(item)
+        
+        # Merge related (complex list field)
+        if other.related:
+            # Create a set of existing URIs for quick lookup
+            existing_uris = {r.uri for r in self.related if hasattr(r, 'uri')}
+            
+            for other_rel in other.related:
+                # Only add if URI doesn't already exist
+                if hasattr(other_rel, 'uri') and other_rel.uri not in existing_uris:
+                    self.related.append(other_rel)
+                    existing_uris.add(other_rel.uri)
+        
+        # Merge x_properties (dict field)
+        if other.x_properties:
+            for key, value in other.x_properties.items():
+                if key not in self.x_properties:
+                    self.x_properties[key] = value
+                elif other_is_newer:
+                    self.x_properties[key] = value
+        
+        # Merge clientpidmap (dict field)
+        if other.clientpidmap:
+            for key, value in other.clientpidmap.items():
+                if key not in self.clientpidmap:
+                    self.clientpidmap[key] = value
+                elif other_is_newer:
+                    self.clientpidmap[key] = value
+        
+        # Always update REV to the latest timestamp
+        if other.rev is not None:
+            if self.rev is None or other.rev > self.rev:
+                self.rev = other.rev
+        
+        return self
 
 
 @dataclass
