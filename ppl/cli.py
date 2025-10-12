@@ -270,6 +270,114 @@ def search(graph_file, query, graph_format):
 
 
 @cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.argument('uid')
+@click.option('--format', type=click.Choice(['text', 'vcard', 'yaml', 'json', 'markdown']), default='text',
+              help='Output format (default: text)')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+def show(graph_file, uid, format, graph_format):
+    """Display detailed information about a single contact.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    UID: Unique identifier of the contact to display
+    """
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    # Get contact by UID
+    contact = graph.get_contact(uid)
+    
+    if not contact:
+        click.echo(f"Error: Contact with UID '{uid}' not found", err=True)
+        sys.exit(1)
+    
+    # Display contact in requested format
+    if format == 'text':
+        # Display human-readable text format
+        click.echo(f"{contact.fn} ({contact.uid})")
+        click.echo("=" * (len(contact.fn) + len(contact.uid) + 3))
+        
+        if contact.email:
+            click.echo(f"Email: {', '.join(contact.email)}")
+        if contact.tel:
+            click.echo(f"Phone: {', '.join(contact.tel)}")
+        if contact.title:
+            click.echo(f"Title: {contact.title}")
+        if contact.org:
+            click.echo(f"Organization: {', '.join(contact.org)}")
+        if contact.adr:
+            click.echo(f"Address: {', '.join(contact.adr)}")
+        if contact.note:
+            click.echo(f"Note: {contact.note}")
+        if contact.gender:
+            click.echo(f"Gender: {contact.gender}")
+        if contact.bday:
+            click.echo(f"Birthday: {contact.bday}")
+        
+        # Show relationships
+        relationships = graph.get_relationships(uid)
+        if relationships:
+            click.echo(f"\nRelationships:")
+            for rel in relationships:
+                rel_types = ', '.join(rel.types) if rel.types else 'related'
+                click.echo(f"- {rel_types} → {rel.target.fn} ({rel.target.uid})")
+        
+        # Show last updated
+        if contact.rev:
+            click.echo(f"\nLast Updated: {contact.rev.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    elif format == 'vcard':
+        # Output as vCard
+        click.echo(vcard.to_vcard(contact))
+    
+    elif format == 'yaml':
+        # Output as YAML
+        click.echo(yaml_serializer.to_yaml(contact))
+    
+    elif format == 'json':
+        # Output as JSON
+        import json
+        contact_dict = {
+            'fn': contact.fn,
+            'uid': contact.uid,
+            'email': contact.email,
+            'tel': contact.tel,
+            'title': contact.title,
+            'org': contact.org,
+            'adr': contact.adr,
+            'note': contact.note,
+            'gender': contact.gender,
+            'bday': contact.bday,
+            'rev': contact.rev.isoformat() if contact.rev else None,
+        }
+        # Add relationships
+        relationships = graph.get_relationships(uid)
+        if relationships:
+            contact_dict['relationships'] = [
+                {
+                    'types': rel.types,
+                    'target_fn': rel.target.fn,
+                    'target_uid': rel.target.uid
+                }
+                for rel in relationships
+            ]
+        click.echo(json.dumps(contact_dict, indent=2))
+    
+    elif format == 'markdown':
+        # Output as Markdown
+        click.echo(markdown.to_markdown(contact))
+
+
+@cli.command()
 @click.argument('source_folder', type=click.Path(exists=True))
 @click.argument('source_format', type=click.Choice(['vcard', 'markdown']))
 @click.argument('graph_file', type=click.Path())
