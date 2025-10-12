@@ -8,6 +8,7 @@ from pathlib import Path
 from .models import ContactGraph, import_pipeline, Contact, curation_pipeline
 from .serializers import vcard, yaml_serializer, markdown
 from .filters import UIDFilter, GenderFilter
+from .services import ConsistencyService
 
 
 # Register filters in the import pipeline
@@ -490,6 +491,71 @@ def filter(graph_file, uid, all_contacts, dry_run, graph_format, verbose):
         click.echo(f"\nDry run complete. {modified_count} contact(s) would be modified.")
     else:
         click.echo(f"\nFilters complete. {modified_count} contact(s) modified.")
+
+
+@cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.option('--vcard-folder', type=click.Path(), help='Path to VCF folder to check')
+@click.option('--markdown-folder', type=click.Path(), help='Path to Markdown folder to check')
+@click.option('--yaml-folder', type=click.Path(), help='Path to YAML folder to check')
+@click.option('--format', 'output_format', type=click.Choice(['text', 'json', 'yaml']), default='text',
+              help='Output format (default: text)')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+@click.option('--verbose', is_flag=True, help='Enable verbose output')
+def check_consistency(graph_file, vcard_folder, markdown_folder, yaml_folder, output_format, graph_format, verbose):
+    """Check consistency across data representations.
+    
+    Compare the graph with VCF, Markdown, and/or YAML folders to detect
+    inconsistencies such as missing contacts, outdated files, or conflicts.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    """
+    # Validate that at least one folder is specified
+    if not any([vcard_folder, markdown_folder, yaml_folder]):
+        click.echo("Error: Must specify at least one folder to check (--vcard-folder, --markdown-folder, or --yaml-folder)", err=True)
+        sys.exit(1)
+    
+    # Load graph
+    if verbose:
+        click.echo(f"Loading graph from {graph_file}...")
+    
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    # Create consistency service
+    service = ConsistencyService(graph)
+    
+    # Run consistency checks
+    if verbose:
+        click.echo("Running consistency checks...")
+        if vcard_folder:
+            click.echo(f"  Checking VCF folder: {vcard_folder}")
+        if markdown_folder:
+            click.echo(f"  Checking Markdown folder: {markdown_folder}")
+        if yaml_folder:
+            click.echo(f"  Checking YAML folder: {yaml_folder}")
+    
+    report = service.check_all_representations(
+        vcf_folder=vcard_folder,
+        markdown_folder=markdown_folder,
+        yaml_folder=yaml_folder
+    )
+    
+    # Generate and display report
+    report_text = service.generate_report(report, format=output_format)
+    click.echo(report_text)
+    
+    # Exit with error code if inconsistencies found
+    if not report.is_consistent:
+        sys.exit(1)
 
 
 @cli.command()

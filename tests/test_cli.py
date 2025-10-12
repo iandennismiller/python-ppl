@@ -5,6 +5,7 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
+from datetime import datetime
 from click.testing import CliRunner
 
 from ppl.cli import cli
@@ -325,4 +326,103 @@ class TestFilterCommand:
             graph_after = ContactGraph()
             graph_after.load(graph_file)
             assert graph_after.get_contact("alice-uid") is not None
+
+
+class TestCheckConsistencyCommand:
+    """Test the 'ppl check-consistency' command."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.runner = CliRunner()
+    
+    def test_check_consistency_no_folders_specified(self):
+        """Test check-consistency without folder arguments."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            graph = ContactGraph()
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['check-consistency', graph_file])
+            
+            assert result.exit_code == 1
+            assert "Must specify at least one folder" in result.output
+    
+    def test_check_consistency_consistent_graph_and_vcf(self):
+        """Test check-consistency with consistent graph and VCF folder."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            vcf_folder = os.path.join(tmpdir, "vcf")
+            os.makedirs(vcf_folder)
+            
+            # Create contact
+            contact = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            contact.rev = datetime.now()
+            
+            # Save to graph
+            graph = ContactGraph()
+            graph.add_contact(contact)
+            graph.save(graph_file)
+            
+            # Export to VCF
+            from ppl.serializers import vcard
+            vcf_file = os.path.join(vcf_folder, "Alice.vcf")
+            with open(vcf_file, 'w') as f:
+                f.write(vcard.to_vcard(contact))
+            
+            result = self.runner.invoke(cli, ['check-consistency', graph_file, '--vcard-folder', vcf_folder])
+            
+            assert result.exit_code == 0
+            assert "CONSISTENT" in result.output
+    
+    def test_check_consistency_inconsistent_graph_and_vcf(self):
+        """Test check-consistency with inconsistent graph and VCF folder."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            vcf_folder = os.path.join(tmpdir, "vcf")
+            os.makedirs(vcf_folder)
+            
+            # Create contact in graph but not in VCF folder
+            contact = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            graph = ContactGraph()
+            graph.add_contact(contact)
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['check-consistency', graph_file, '--vcard-folder', vcf_folder])
+            
+            assert result.exit_code == 1
+            assert "INCONSISTENT" in result.output
+            assert "Alice" in result.output
+    
+    def test_check_consistency_json_format(self):
+        """Test check-consistency with JSON output format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            vcf_folder = os.path.join(tmpdir, "vcf")
+            os.makedirs(vcf_folder)
+            
+            graph = ContactGraph()
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['check-consistency', graph_file, '--vcard-folder', vcf_folder, '--format', 'json'])
+            
+            assert result.exit_code == 0
+            assert '"is_consistent": true' in result.output
+    
+    def test_check_consistency_verbose(self):
+        """Test check-consistency with verbose flag."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            vcf_folder = os.path.join(tmpdir, "vcf")
+            os.makedirs(vcf_folder)
+            
+            graph = ContactGraph()
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['check-consistency', graph_file, '--vcard-folder', vcf_folder, '--verbose'])
+            
+            assert result.exit_code == 0
+            assert "Loading graph" in result.output
+            assert "Running consistency checks" in result.output
+
 
