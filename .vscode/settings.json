@@ -1,0 +1,17 @@
+{
+    "files.exclude": {
+        "**/.vscode/": true,
+        ".editorconfig": true,
+        ".eslintignore": true,
+        ".eslintrc": true,
+        ".npmrc": true,
+        "versions.json": true,
+        "version-bump.mjs": true,
+        "main.js": true,
+        "package-lock.json": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "build/": true,
+        "dist/": true
+    }
+}
