@@ -34,6 +34,9 @@ def cli():
 def import_contacts(folder_path, graph_file, format, verbose):
     """Import contacts from a folder and save to graph.
     
+    Uses intelligent merging to preserve existing data while importing new information.
+    Missing fields in imported contacts do not delete existing graph data.
+    
     FOLDER_PATH: Path to folder containing contact files
     GRAPH_FILE: Path to save the contact graph (GraphML format)
     """
@@ -63,9 +66,11 @@ def import_contacts(folder_path, graph_file, format, verbose):
         except Exception as e:
             click.echo(f"Warning: Could not load existing graph: {e}", err=True)
     
-    # Add contacts to graph
+    # Merge contacts into graph using intelligent merging
     added = 0
     updated = 0
+    skipped = 0
+    
     for contact in contacts:
         if not contact.uid:
             # Apply filters if needed
@@ -73,22 +78,25 @@ def import_contacts(folder_path, graph_file, format, verbose):
             context = FilterContext(pipeline_name="import")
             contact = import_pipeline.run(contact, context)
         
-        if graph.get_contact(contact.uid):
-            graph.update_contact(contact)
-            updated += 1
-        else:
-            graph.add_contact(contact)
+        # Use merge_contact for intelligent merging
+        modified, action = graph.merge_contact(contact)
+        
+        if action == "added":
             added += 1
+        elif action == "updated":
+            updated += 1
+        elif action == "skipped":
+            skipped += 1
     
     # Save graph
     graph.save(graph_file)
     
     if verbose:
-        click.echo(f"Added {added} contacts, updated {updated} contacts")
+        click.echo(f"Added: {added}, Updated: {updated}, Skipped: {skipped}")
         click.echo(f"Graph saved to {graph_file}")
         click.echo(f"Total contacts in graph: {len(graph.get_all_contacts())}")
     else:
-        click.echo(f"Imported {len(contacts)} contacts to {graph_file}")
+        click.echo(f"Imported {len(contacts)} contacts to {graph_file} (added: {added}, updated: {updated}, skipped: {skipped})")
 
 
 @cli.command()
@@ -96,9 +104,13 @@ def import_contacts(folder_path, graph_file, format, verbose):
 @click.argument('output_folder', type=click.Path())
 @click.option('--format', type=click.Choice(['vcard', 'yaml', 'markdown']), default='vcard',
               help='Format to export (default: vcard)')
+@click.option('--force', is_flag=True, help='Force overwrite all files (ignore change detection)')
 @click.option('--verbose', is_flag=True, help='Enable verbose output')
-def export_contacts(graph_file, output_folder, format, verbose):
+def export_contacts(graph_file, output_folder, format, force, verbose):
     """Export contacts from graph to a folder.
+    
+    Only writes files when data has changed to minimize file system operations.
+    Use --force to override and write all files.
     
     GRAPH_FILE: Path to the contact graph file
     OUTPUT_FOLDER: Path to folder where contacts will be exported
@@ -121,28 +133,36 @@ def export_contacts(graph_file, output_folder, format, verbose):
     
     if verbose:
         click.echo(f"Exporting {len(contacts)} contacts to {output_folder} in {format} format...")
+        if force:
+            click.echo("Force mode enabled - all files will be written")
     
     # Export contacts based on format
+    written = 0
+    skipped = 0
+    
     if format == 'vcard':
-        vcard.bulk_export(contacts, output_folder)
+        written, skipped = vcard.bulk_export(contacts, output_folder, force=force)
     elif format == 'yaml':
         # Create output folder
         Path(output_folder).mkdir(parents=True, exist_ok=True)
+        # TODO: Implement change detection for YAML when bulk_export is available
         for contact in contacts:
             filename = contact.fn.replace('/', '_').replace('\\', '_') + '.yaml'
             file_path = Path(output_folder) / filename
             with open(file_path, 'w') as f:
                 f.write(yaml_serializer.to_yaml(contact))
+            written += 1
     elif format == 'markdown':
-        markdown.bulk_export_markdown(contacts, output_folder)
+        written, skipped = markdown.bulk_export_markdown(contacts, output_folder, force=force)
     else:
         click.echo(f"Unknown format: {format}", err=True)
         sys.exit(1)
     
     if verbose:
-        click.echo(f"Exported {len(contacts)} contacts")
+        click.echo(f"Written: {written}, Skipped: {skipped}")
+        click.echo(f"Export complete")
     else:
-        click.echo(f"Exported {len(contacts)} contacts to {output_folder}")
+        click.echo(f"Exported to {output_folder} (written: {written}, skipped: {skipped})")
 
 
 @cli.command()
@@ -279,31 +299,43 @@ def convert(source_folder, source_format, graph_file, target_folder, target_form
         except Exception as e:
             click.echo(f"Warning: Could not load existing graph: {e}", err=True)
     
-    # Add contacts to graph
+    # Add contacts to graph using intelligent merging
+    added = 0
+    updated = 0
+    skipped = 0
+    
     for contact in contacts:
         if not contact.uid:
             from .models import FilterContext
             context = FilterContext(pipeline_name="import")
             contact = import_pipeline.run(contact, context)
         
-        if graph.get_contact(contact.uid):
-            graph.update_contact(contact)
-        else:
-            graph.add_contact(contact)
+        # Use merge_contact for intelligent merging
+        modified, action = graph.merge_contact(contact)
+        if action == "added":
+            added += 1
+        elif action == "updated":
+            updated += 1
+        elif action == "skipped":
+            skipped += 1
     
     # Save graph
     graph.save(graph_file)
     if verbose:
         click.echo(f"Graph saved to {graph_file}")
+        click.echo(f"Added: {added}, Updated: {updated}, Skipped: {skipped}")
     
     # Get all contacts for export
     all_contacts = graph.get_all_contacts()
     
     # Export to target format
+    written = 0
+    skipped_export = 0
+    
     if target_format == 'vcard':
-        vcard.bulk_export(all_contacts, target_folder)
+        written, skipped_export = vcard.bulk_export(all_contacts, target_folder)
     elif target_format == 'markdown':
-        markdown.bulk_export_markdown(all_contacts, target_folder)
+        written, skipped_export = markdown.bulk_export_markdown(all_contacts, target_folder)
     elif target_format == 'yaml':
         Path(target_folder).mkdir(parents=True, exist_ok=True)
         for contact in all_contacts:
@@ -311,11 +343,16 @@ def convert(source_folder, source_format, graph_file, target_folder, target_form
             file_path = Path(target_folder) / filename
             with open(file_path, 'w') as f:
                 f.write(yaml_serializer.to_yaml(contact))
+            written += 1
     else:
         click.echo(f"Unknown target format: {target_format}", err=True)
         sys.exit(1)
     
-    click.echo(f"Converted {len(all_contacts)} contacts from {source_format} to {target_format}")
+    if verbose:
+        click.echo(f"Converted {len(all_contacts)} contacts from {source_format} to {target_format}")
+        click.echo(f"Export: Written: {written}, Skipped: {skipped_export}")
+    else:
+        click.echo(f"Converted {len(all_contacts)} contacts from {source_format} to {target_format}")
 
 
 if __name__ == '__main__':

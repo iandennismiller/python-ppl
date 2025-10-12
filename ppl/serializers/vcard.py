@@ -4,7 +4,7 @@ vCard serializer for importing and exporting Contact objects.
 import os
 import vobject
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pathlib import Path
 
 from ..models import Contact, Related, Relationship, ContactGraph
@@ -358,23 +358,37 @@ def bulk_import(folder_path: str) -> List[Contact]:
     return contacts
 
 
-def bulk_export(contacts: List[Contact], folder_path: str) -> None:
+def bulk_export(contacts: List[Contact], folder_path: str, force: bool = False) -> Tuple[int, int]:
     """
     Export multiple contacts to vCard files in a folder.
+    Only writes files when data has changed unless force=True.
     
     Args:
         contacts: List of contacts to export
         folder_path: Path to folder where .vcf files will be written
+        force: If True, write all files regardless of changes
+        
+    Returns:
+        Tuple of (files_written, files_skipped)
     """
     folder = Path(folder_path)
     folder.mkdir(parents=True, exist_ok=True)
+    
+    written = 0
+    skipped = 0
     
     for contact in contacts:
         # Use FN as filename, sanitized
         filename = contact.fn.replace('/', '_').replace('\\', '_') + '.vcf'
         file_path = folder / filename
         
-        export_vcard(contact, str(file_path))
+        if force or should_export_vcard(contact, str(file_path)):
+            export_vcard(contact, str(file_path))
+            written += 1
+        else:
+            skipped += 1
+    
+    return (written, skipped)
 
 
 def extract_relationships(contact: Contact) -> List[Relationship]:
@@ -429,3 +443,54 @@ def compare_rev(contact1: Contact, contact2: Contact) -> bool:
         True if contact1 is newer or equal, False otherwise
     """
     return contact1.compare_rev(contact2) >= 0
+
+
+def should_export_vcard(contact: Contact, file_path: str) -> bool:
+    """
+    Determine if vCard file should be written.
+    
+    Returns True if:
+    - File doesn't exist
+    - File exists but contact has newer REV
+    - File exists but content differs (REV is same)
+    
+    Returns False if:
+    - File exists with same or newer REV and identical content
+    
+    Args:
+        contact: Contact to potentially export
+        file_path: Path where file would be written
+        
+    Returns:
+        True if file should be written, False otherwise
+    """
+    # If file doesn't exist, always export
+    if not os.path.exists(file_path):
+        return True
+    
+    try:
+        # Load existing contact from file
+        existing_contact = import_vcard(file_path)
+        
+        # Compare REV timestamps
+        rev_comparison = contact.compare_rev(existing_contact)
+        
+        # If contact is newer, export
+        if rev_comparison > 0:
+            return True
+        
+        # If existing is newer, don't export
+        if rev_comparison < 0:
+            return False
+        
+        # REV is equal or both None, compare content
+        # Convert both to vCard strings and compare
+        new_vcard = to_vcard(contact)
+        existing_vcard = to_vcard(existing_contact)
+        
+        # If content is different, export
+        return new_vcard != existing_vcard
+    
+    except Exception:
+        # If we can't read the existing file, export to be safe
+        return True
