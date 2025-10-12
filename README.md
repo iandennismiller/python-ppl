@@ -254,6 +254,26 @@ pytest tests/ --cov=ppl --cov-report=term-missing
 
 # Run specific test file
 pytest tests/test_contact.py -v
+
+# Run only integration tests
+pytest tests/test_integration.py -v
+```
+
+### Integration Tests
+
+The test suite includes comprehensive integration tests (`tests/test_integration.py`) that simulate real user workflows:
+
+- **Complete Workflows**: End-to-end scenarios from creating contacts to exporting
+- **Format Conversions**: vCard → YAML → Markdown roundtrips
+- **Filter Pipeline**: Integration of filters with import/export operations
+- **Graph Operations**: Building and querying contact relationship networks
+- **Collaborative Management**: Multi-user scenarios with different formats
+- **Error Handling**: Graceful handling of invalid data and missing files
+- **Performance**: Testing with 100+ contacts
+
+Run integration tests separately:
+```bash
+pytest tests/test_integration.py -v
 ```
 
 ### Other Development Tasks
@@ -274,11 +294,20 @@ make help
 
 ### Test Coverage
 
-Current test coverage: **64%** (core modules >80%)
+Current test coverage: **68%** (core modules >80%)
 
-- 87 passing tests
+- 104 passing tests
+  - 87 unit tests for individual modules
+  - 17 integration tests simulating user workflows
 - Full coverage of models, serializers, and filters
-- Integration tests for import/export cycles
+- Integration tests cover:
+  - Complete workflows from import to export
+  - Cross-format conversions (vCard ↔ YAML ↔ Markdown)
+  - Filter pipeline integration
+  - Graph operations with relationships
+  - Collaborative contact management scenarios
+  - Error handling and edge cases
+  - Performance with large datasets (100+ contacts)
 
 ### Project Structure
 
