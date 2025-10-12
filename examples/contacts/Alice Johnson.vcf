@@ -1,0 +1,17 @@
+BEGIN:VCARD
+VERSION:4.0
+UID:urn:uuid:550e8400-e29b-41d4-a716-446655440001
+EMAIL:alice.johnson@example.com
+EMAIL:ajohnson@work.com
+FN:Alice Johnson
+NOTE:Team lead for the backend team
+ORG:T;e;c;h; ;C;o;r;p
+ORG:E;n;g;i;n;e;e;r;i;n;g
+RELATED;TYPE="friend,colleague":urn:uuid:550e8400-e29b-41d4-a716-4466554400
+ 02
+RELATED;TYPE=parent:urn:uuid:550e8400-e29b-41d4-a716-446655440003
+REV:2025-10-12T00:21:19.164421
+TEL:+1-555-0100
+TEL:+1-555-0101
+TITLE:Software Engineer
+END:VCARD

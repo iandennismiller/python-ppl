@@ -1,0 +1,14 @@
+BEGIN:VCARD
+VERSION:4.0
+UID:urn:uuid:550e8400-e29b-41d4-a716-446655440002
+EMAIL:bob.smith@example.com
+FN:Bob Smith
+NOTE:Leads the sales team
+ORG:T;e;c;h; ;C;o;r;p
+ORG:S;a;l;e;s
+RELATED;TYPE="friend,colleague":urn:uuid:550e8400-e29b-41d4-a716-4466554400
+ 01
+REV:2025-10-12T00:21:19.164441
+TEL:+1-555-0200
+TITLE:Sales Manager
+END:VCARD
