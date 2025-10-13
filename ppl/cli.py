@@ -5,14 +5,18 @@ import click
 import sys
 from pathlib import Path
 
-from .models import ContactGraph, import_pipeline, Contact
+from .models import ContactGraph, import_pipeline, Contact, curation_pipeline
 from .serializers import vcard, yaml_serializer, markdown
 from .filters import UIDFilter, GenderFilter
+from .services import ConsistencyService
 
 
 # Register filters in the import pipeline
 import_pipeline.register(UIDFilter())
 import_pipeline.register(GenderFilter())
+
+# Register filters in the curation pipeline
+curation_pipeline.register(GenderFilter())
 
 
 @click.group()
@@ -267,6 +271,390 @@ def search(graph_file, query, graph_format):
         if contact.org:
             click.echo(f"    Org: {', '.join(contact.org)}")
         click.echo()
+
+
+@cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.argument('uid')
+@click.option('--format', type=click.Choice(['text', 'vcard', 'yaml', 'json', 'markdown']), default='text',
+              help='Output format (default: text)')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+def show(graph_file, uid, format, graph_format):
+    """Display detailed information about a single contact.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    UID: Unique identifier of the contact to display
+    """
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    # Get contact by UID
+    contact = graph.get_contact(uid)
+    
+    if not contact:
+        click.echo(f"Error: Contact with UID '{uid}' not found", err=True)
+        sys.exit(1)
+    
+    # Display contact in requested format
+    if format == 'text':
+        # Display human-readable text format
+        click.echo(f"{contact.fn} ({contact.uid})")
+        click.echo("=" * (len(contact.fn) + len(contact.uid) + 3))
+        
+        if contact.email:
+            click.echo(f"Email: {', '.join(contact.email)}")
+        if contact.tel:
+            click.echo(f"Phone: {', '.join(contact.tel)}")
+        if contact.title:
+            click.echo(f"Title: {contact.title}")
+        if contact.org:
+            click.echo(f"Organization: {', '.join(contact.org)}")
+        if contact.adr:
+            click.echo(f"Address: {', '.join(contact.adr)}")
+        if contact.note:
+            click.echo(f"Note: {contact.note}")
+        if contact.gender:
+            click.echo(f"Gender: {contact.gender}")
+        if contact.bday:
+            click.echo(f"Birthday: {contact.bday}")
+        
+        # Show relationships
+        relationships = graph.get_relationships(uid)
+        if relationships:
+            click.echo(f"\nRelationships:")
+            for rel in relationships:
+                rel_types = ', '.join(rel.types) if rel.types else 'related'
+                click.echo(f"- {rel_types} → {rel.target.fn} ({rel.target.uid})")
+        
+        # Show last updated
+        if contact.rev:
+            click.echo(f"\nLast Updated: {contact.rev.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    elif format == 'vcard':
+        # Output as vCard
+        click.echo(vcard.to_vcard(contact))
+    
+    elif format == 'yaml':
+        # Output as YAML
+        click.echo(yaml_serializer.to_yaml(contact))
+    
+    elif format == 'json':
+        # Output as JSON
+        import json
+        contact_dict = {
+            'fn': contact.fn,
+            'uid': contact.uid,
+            'email': contact.email,
+            'tel': contact.tel,
+            'title': contact.title,
+            'org': contact.org,
+            'adr': contact.adr,
+            'note': contact.note,
+            'gender': contact.gender,
+            'bday': contact.bday,
+            'rev': contact.rev.isoformat() if contact.rev else None,
+        }
+        # Add relationships
+        relationships = graph.get_relationships(uid)
+        if relationships:
+            contact_dict['relationships'] = [
+                {
+                    'types': rel.types,
+                    'target_fn': rel.target.fn,
+                    'target_uid': rel.target.uid
+                }
+                for rel in relationships
+            ]
+        click.echo(json.dumps(contact_dict, indent=2))
+    
+    elif format == 'markdown':
+        # Output as Markdown
+        click.echo(markdown.to_markdown(contact))
+
+
+@cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.argument('uid', required=False)
+@click.option('--all', 'all_contacts', is_flag=True, help='Run filters on all contacts')
+@click.option('--dry-run', is_flag=True, help='Preview changes without saving')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+@click.option('--verbose', is_flag=True, help='Enable verbose output')
+def filter(graph_file, uid, all_contacts, dry_run, graph_format, verbose):
+    """Run filter pipeline on contacts.
+    
+    Execute the curation pipeline on a specific contact or all contacts.
+    Use --dry-run to preview changes without saving to the graph.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    UID: Unique identifier of the contact to filter (optional if --all is used)
+    """
+    # Validate arguments
+    if not uid and not all_contacts:
+        click.echo("Error: Must specify either UID or --all flag", err=True)
+        sys.exit(1)
+    
+    if uid and all_contacts:
+        click.echo("Error: Cannot specify both UID and --all flag", err=True)
+        sys.exit(1)
+    
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    # Get contacts to filter
+    if all_contacts:
+        contacts = graph.get_all_contacts()
+        if verbose:
+            click.echo(f"Running filters on {len(contacts)} contacts...")
+    else:
+        contact = graph.get_contact(uid)
+        if not contact:
+            click.echo(f"Error: Contact with UID '{uid}' not found", err=True)
+            sys.exit(1)
+        contacts = [contact]
+        if verbose:
+            click.echo(f"Running filters on {contact.fn}...")
+    
+    # Run filters
+    from .models import FilterContext
+    import copy
+    
+    context = FilterContext(pipeline_name="curation")
+    modified_count = 0
+    changes = []
+    
+    for contact in contacts:
+        # Create a copy to compare before/after
+        contact_before = copy.deepcopy(contact)
+        
+        # Run curation pipeline
+        contact_after = curation_pipeline.run(contact, context)
+        
+        # Check for changes
+        contact_changed = False
+        contact_changes = []
+        
+        # Compare fields for changes
+        if contact_before.gender != contact_after.gender:
+            contact_changed = True
+            contact_changes.append(f"  GENDER: {contact_before.gender} → {contact_after.gender}")
+        
+        if contact_before.email != contact_after.email:
+            contact_changed = True
+            contact_changes.append(f"  EMAIL: {contact_before.email} → {contact_after.email}")
+        
+        if contact_before.tel != contact_after.tel:
+            contact_changed = True
+            contact_changes.append(f"  TEL: {contact_before.tel} → {contact_after.tel}")
+        
+        if contact_changed:
+            modified_count += 1
+            changes.append({
+                'contact': contact_after,
+                'changes': contact_changes
+            })
+            
+            if verbose or not all_contacts:
+                click.echo(f"\n{contact_after.fn} ({contact_after.uid}):")
+                for change in contact_changes:
+                    click.echo(change)
+            
+            # Update graph unless dry-run
+            if not dry_run:
+                graph.update_contact(contact_after)
+    
+    # Save graph unless dry-run
+    if not dry_run and modified_count > 0:
+        graph.save(graph_file, format=graph_format)
+        if verbose:
+            click.echo(f"\nGraph saved to {graph_file}")
+    
+    # Summary
+    if dry_run:
+        click.echo(f"\nDry run complete. {modified_count} contact(s) would be modified.")
+    else:
+        click.echo(f"\nFilters complete. {modified_count} contact(s) modified.")
+
+
+@cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.option('--vcard-folder', type=click.Path(), help='Path to VCF folder to check')
+@click.option('--markdown-folder', type=click.Path(), help='Path to Markdown folder to check')
+@click.option('--yaml-folder', type=click.Path(), help='Path to YAML folder to check')
+@click.option('--format', 'output_format', type=click.Choice(['text', 'json', 'yaml']), default='text',
+              help='Output format (default: text)')
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+@click.option('--verbose', is_flag=True, help='Enable verbose output')
+def check_consistency(graph_file, vcard_folder, markdown_folder, yaml_folder, output_format, graph_format, verbose):
+    """Check consistency across data representations.
+    
+    Compare the graph with VCF, Markdown, and/or YAML folders to detect
+    inconsistencies such as missing contacts, outdated files, or conflicts.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    """
+    # Validate that at least one folder is specified
+    if not any([vcard_folder, markdown_folder, yaml_folder]):
+        click.echo("Error: Must specify at least one folder to check (--vcard-folder, --markdown-folder, or --yaml-folder)", err=True)
+        sys.exit(1)
+    
+    # Load graph
+    if verbose:
+        click.echo(f"Loading graph from {graph_file}...")
+    
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    # Create consistency service
+    service = ConsistencyService(graph)
+    
+    # Run consistency checks
+    if verbose:
+        click.echo("Running consistency checks...")
+        if vcard_folder:
+            click.echo(f"  Checking VCF folder: {vcard_folder}")
+        if markdown_folder:
+            click.echo(f"  Checking Markdown folder: {markdown_folder}")
+        if yaml_folder:
+            click.echo(f"  Checking YAML folder: {yaml_folder}")
+    
+    report = service.check_all_representations(
+        vcf_folder=vcard_folder,
+        markdown_folder=markdown_folder,
+        yaml_folder=yaml_folder
+    )
+    
+    # Generate and display report
+    report_text = service.generate_report(report, format=output_format)
+    click.echo(report_text)
+    
+    # Exit with error code if inconsistencies found
+    if not report.is_consistent:
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+def stats(graph_file, graph_format):
+    """Display statistics about the contact graph.
+    
+    Shows total contacts, relationships, field population, and REV timestamp analysis.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    """
+    from datetime import datetime
+    from collections import Counter
+    
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    contacts = graph.get_all_contacts()
+    
+    if not contacts:
+        click.echo("No contacts found in graph")
+        return
+    
+    # Count contacts
+    total_contacts = len(contacts)
+    
+    # Count relationships and types
+    relationship_types = Counter()
+    total_relationships = 0
+    
+    for contact in contacts:
+        relationships = graph.get_relationships(contact.uid)
+        total_relationships += len(relationships)
+        for rel in relationships:
+            for rel_type in rel.types:
+                relationship_types[rel_type] += 1
+    
+    # Field population statistics
+    with_email = sum(1 for c in contacts if c.email)
+    with_phone = sum(1 for c in contacts if c.tel)
+    with_address = sum(1 for c in contacts if c.adr)
+    with_org = sum(1 for c in contacts if c.org)
+    with_gender = sum(1 for c in contacts if c.gender)
+    
+    # REV timestamp analysis
+    contacts_with_rev = [c for c in contacts if c.rev]
+    oldest_rev = None
+    newest_rev = None
+    avg_age_days = None
+    
+    if contacts_with_rev:
+        oldest_rev = min(c.rev for c in contacts_with_rev)
+        newest_rev = max(c.rev for c in contacts_with_rev)
+        
+        # Calculate average age
+        now = datetime.now()
+        total_age_days = sum((now - c.rev).days for c in contacts_with_rev)
+        avg_age_days = total_age_days / len(contacts_with_rev)
+    
+    # Display statistics
+    click.echo("Graph Statistics")
+    click.echo("=" * 80)
+    click.echo(f"Total Contacts: {total_contacts}")
+    click.echo(f"Total Relationships: {total_relationships}")
+    click.echo()
+    
+    if relationship_types:
+        click.echo("Relationship Types:")
+        for rel_type, count in relationship_types.most_common():
+            click.echo(f"  - {rel_type}: {count}")
+        click.echo()
+    
+    click.echo("Contact Fields:")
+    click.echo(f"  - With Email: {with_email} ({100 * with_email / total_contacts:.1f}%)")
+    click.echo(f"  - With Phone: {with_phone} ({100 * with_phone / total_contacts:.1f}%)")
+    click.echo(f"  - With Address: {with_address} ({100 * with_address / total_contacts:.1f}%)")
+    click.echo(f"  - With Organization: {with_org} ({100 * with_org / total_contacts:.1f}%)")
+    click.echo(f"  - With Gender: {with_gender} ({100 * with_gender / total_contacts:.1f}%)")
+    click.echo()
+    
+    if contacts_with_rev:
+        click.echo("REV Timestamps:")
+        click.echo(f"  - Oldest: {oldest_rev.strftime('%Y-%m-%d')}")
+        click.echo(f"  - Newest: {newest_rev.strftime('%Y-%m-%d')}")
+        click.echo(f"  - Average Age: {avg_age_days:.0f} days (~{avg_age_days / 30:.1f} months)")
+        click.echo(f"  - Contacts with REV: {len(contacts_with_rev)} ({100 * len(contacts_with_rev) / total_contacts:.1f}%)")
+    else:
+        click.echo("REV Timestamps:")
+        click.echo("  - No contacts have REV timestamps")
 
 
 @cli.command()
