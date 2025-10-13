@@ -559,6 +559,105 @@ def check_consistency(graph_file, vcard_folder, markdown_folder, yaml_folder, ou
 
 
 @cli.command()
+@click.argument('graph_file', type=click.Path(exists=True))
+@click.option('--graph-format', type=click.Choice(['graphml', 'json']), default=None,
+              help='Format for graph file (default: auto-detect from extension)')
+def stats(graph_file, graph_format):
+    """Display statistics about the contact graph.
+    
+    Shows total contacts, relationships, field population, and REV timestamp analysis.
+    
+    GRAPH_FILE: Path to the contact graph file (.graphml or .json)
+    """
+    from datetime import datetime
+    from collections import Counter
+    
+    # Load graph
+    graph = ContactGraph()
+    try:
+        graph.load(graph_file, format=graph_format)
+    except FileNotFoundError:
+        click.echo(f"Error: Graph file not found: {graph_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading graph: {e}", err=True)
+        sys.exit(1)
+    
+    contacts = graph.get_all_contacts()
+    
+    if not contacts:
+        click.echo("No contacts found in graph")
+        return
+    
+    # Count contacts
+    total_contacts = len(contacts)
+    
+    # Count relationships and types
+    relationship_types = Counter()
+    total_relationships = 0
+    
+    for contact in contacts:
+        relationships = graph.get_relationships(contact.uid)
+        total_relationships += len(relationships)
+        for rel in relationships:
+            for rel_type in rel.types:
+                relationship_types[rel_type] += 1
+    
+    # Field population statistics
+    with_email = sum(1 for c in contacts if c.email)
+    with_phone = sum(1 for c in contacts if c.tel)
+    with_address = sum(1 for c in contacts if c.adr)
+    with_org = sum(1 for c in contacts if c.org)
+    with_gender = sum(1 for c in contacts if c.gender)
+    
+    # REV timestamp analysis
+    contacts_with_rev = [c for c in contacts if c.rev]
+    oldest_rev = None
+    newest_rev = None
+    avg_age_days = None
+    
+    if contacts_with_rev:
+        oldest_rev = min(c.rev for c in contacts_with_rev)
+        newest_rev = max(c.rev for c in contacts_with_rev)
+        
+        # Calculate average age
+        now = datetime.now()
+        total_age_days = sum((now - c.rev).days for c in contacts_with_rev)
+        avg_age_days = total_age_days / len(contacts_with_rev)
+    
+    # Display statistics
+    click.echo("Graph Statistics")
+    click.echo("=" * 80)
+    click.echo(f"Total Contacts: {total_contacts}")
+    click.echo(f"Total Relationships: {total_relationships}")
+    click.echo()
+    
+    if relationship_types:
+        click.echo("Relationship Types:")
+        for rel_type, count in relationship_types.most_common():
+            click.echo(f"  - {rel_type}: {count}")
+        click.echo()
+    
+    click.echo("Contact Fields:")
+    click.echo(f"  - With Email: {with_email} ({100 * with_email / total_contacts:.1f}%)")
+    click.echo(f"  - With Phone: {with_phone} ({100 * with_phone / total_contacts:.1f}%)")
+    click.echo(f"  - With Address: {with_address} ({100 * with_address / total_contacts:.1f}%)")
+    click.echo(f"  - With Organization: {with_org} ({100 * with_org / total_contacts:.1f}%)")
+    click.echo(f"  - With Gender: {with_gender} ({100 * with_gender / total_contacts:.1f}%)")
+    click.echo()
+    
+    if contacts_with_rev:
+        click.echo("REV Timestamps:")
+        click.echo(f"  - Oldest: {oldest_rev.strftime('%Y-%m-%d')}")
+        click.echo(f"  - Newest: {newest_rev.strftime('%Y-%m-%d')}")
+        click.echo(f"  - Average Age: {avg_age_days:.0f} days (~{avg_age_days / 30:.1f} months)")
+        click.echo(f"  - Contacts with REV: {len(contacts_with_rev)} ({100 * len(contacts_with_rev) / total_contacts:.1f}%)")
+    else:
+        click.echo("REV Timestamps:")
+        click.echo("  - No contacts have REV timestamps")
+
+
+@cli.command()
 @click.argument('source_folder', type=click.Path(exists=True))
 @click.argument('source_format', type=click.Choice(['vcard', 'markdown']))
 @click.argument('graph_file', type=click.Path())

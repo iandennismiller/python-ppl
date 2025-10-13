@@ -426,3 +426,100 @@ class TestCheckConsistencyCommand:
             assert "Running consistency checks" in result.output
 
 
+class TestStatsCommand:
+    """Test the 'ppl stats' command."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.runner = CliRunner()
+    
+    def test_stats_empty_graph(self):
+        """Test stats command with empty graph."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            graph = ContactGraph()
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['stats', graph_file])
+            
+            assert result.exit_code == 0
+            assert "No contacts found" in result.output
+    
+    def test_stats_basic_contacts(self):
+        """Test stats with basic contacts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            # Create contacts
+            alice = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            bob = Contact(fn="Bob", tel=["+1-555-0001"], uid="bob-uid")
+            
+            graph = ContactGraph()
+            graph.add_contact(alice)
+            graph.add_contact(bob)
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['stats', graph_file])
+            
+            assert result.exit_code == 0
+            assert "Total Contacts: 2" in result.output
+            assert "With Email: 1 (50.0%)" in result.output
+            assert "With Phone: 1 (50.0%)" in result.output
+    
+    def test_stats_with_relationships(self):
+        """Test stats command with relationships."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            # Create contacts
+            alice = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            bob = Contact(fn="Bob", email=["bob@example.com"], uid="bob-uid")
+            
+            graph = ContactGraph()
+            graph.add_contact(alice)
+            graph.add_contact(bob)
+            
+            # Add relationship
+            from ppl.models import Relationship
+            rel = Relationship(source=alice, target=bob, types=['friend', 'colleague'])
+            graph.add_relationship(rel)
+            
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['stats', graph_file])
+            
+            assert result.exit_code == 0
+            assert "Total Contacts: 2" in result.output
+            assert "Total Relationships: 1" in result.output
+            assert "friend: 1" in result.output
+            assert "colleague: 1" in result.output
+    
+    def test_stats_with_rev_timestamps(self):
+        """Test stats command with REV timestamps."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph_file = os.path.join(tmpdir, "test.graphml")
+            
+            # Create contact with REV
+            contact = Contact(fn="Alice", email=["alice@example.com"], uid="alice-uid")
+            contact.rev = datetime(2024, 1, 1)
+            
+            graph = ContactGraph()
+            graph.add_contact(contact)
+            graph.save(graph_file)
+            
+            result = self.runner.invoke(cli, ['stats', graph_file])
+            
+            assert result.exit_code == 0
+            assert "REV Timestamps:" in result.output
+            assert "Oldest: 2024-01-01" in result.output
+            assert "Contacts with REV: 1 (100.0%)" in result.output
+    
+    def test_stats_missing_graph_file(self):
+        """Test stats command with non-existent graph file."""
+        result = self.runner.invoke(cli, ['stats', '/nonexistent/graph.graphml'])
+        
+        assert result.exit_code != 0
+        assert "not found" in result.output or "Error" in result.output
+
+

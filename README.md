@@ -120,6 +120,9 @@ python -m ppl.cli filter contacts.graphml --all --dry-run  # Preview changes
 python -m ppl.cli check-consistency contacts.graphml --vcard-folder contacts/
 python -m ppl.cli check-consistency contacts.graphml --markdown-folder md/ --format json
 
+# Display graph statistics
+python -m ppl.cli stats contacts.graphml
+
 # Export contacts from the graph to a folder
 python -m ppl.cli export-contacts contacts.graphml output --format markdown
 
@@ -148,6 +151,40 @@ ppl show contacts.graphml urn:uuid:alice-uid --format json
 ppl show contacts.graphml urn:uuid:alice-uid --format vcard
 ppl show contacts.graphml urn:uuid:alice-uid --format yaml
 ppl show contacts.graphml urn:uuid:alice-uid --format markdown
+```
+
+#### `ppl stats` - Graph Statistics
+
+Display comprehensive statistics about your contact graph:
+
+```bash
+# Show all statistics
+ppl stats contacts.graphml
+
+# Example output:
+# Graph Statistics
+# ================================================================================
+# Total Contacts: 150
+# Total Relationships: 287
+# 
+# Relationship Types:
+#   - friend: 89
+#   - colleague: 67
+#   - parent: 45
+#   - child: 45
+# 
+# Contact Fields:
+#   - With Email: 145 (96.7%)
+#   - With Phone: 132 (88.0%)
+#   - With Address: 89 (59.3%)
+#   - With Organization: 112 (74.7%)
+#   - With Gender: 15 (10.0%)
+# 
+# REV Timestamps:
+#   - Oldest: 2023-01-15
+#   - Newest: 2024-10-12
+#   - Average Age: 180 days (~6.0 months)
+
 ```
 
 #### `ppl filter` - On-Demand Curation
